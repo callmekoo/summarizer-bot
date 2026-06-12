@@ -39,15 +39,51 @@ docker run --rm --env-file .env summarizer-bot
 
 Секреты передаются через `--env-file` (`.env` в образ не копируется, см. `.dockerignore`).
 
+Секреты — через `--env-file`. Для постоянной работы удобнее Docker Compose (ниже).
+
 **Healthcheck.** Бот пишет heartbeat-файл (`HEARTBEAT_FILE`), пока опрашивает Telegram;
-`HEALTHCHECK` в образе считает контейнер `unhealthy`, если файл «протух» (> 60 с). Сам по
-себе Docker только помечает статус — для автоперезапуска нужна политика, например:
+`HEALTHCHECK` в образе считает контейнер `unhealthy`, если файл «протух» (> 60 с). Docker
+сам по себе только помечает статус: `restart` перезапускает контейнер, лишь когда процесс
+**вышел**. Если бот «завис» (процесс жив, polling умер) — нужен `autoheal` (см. compose).
+(При переходе на webhook healthcheck заменим на HTTP `/health` — см. PLAN, Этап 4.)
+
+## Docker Compose (запуск на сервере)
+
+На сервере нужен Docker с плагином compose. Установка (один раз):
 
 ```sh
-docker run -d --restart unless-stopped --env-file .env summarizer-bot
+# Debian/Ubuntu — официальный скрипт ставит Docker + compose-плагин
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker "$USER"   # чтобы запускать без sudo; затем перелогиниться
 ```
 
-(При переходе на webhook healthcheck заменим на HTTP `/health` — см. PLAN, Этап 4.)
+Деплой:
+
+```sh
+git clone <repo-url> summarizer && cd summarizer
+cp .env.example .env              # вписать BOT_TOKEN, OPENROUTER_API_KEY, ALLOWED_USER_IDS
+docker compose up -d --build      # собрать образ и поднять в фоне
+```
+
+Управление:
+
+```sh
+docker compose ps                 # статус + health
+docker compose logs -f bot        # логи (Ctrl+C — выйти, бот продолжит работать)
+docker compose restart bot        # перезапуск
+docker compose down               # остановить и удалить контейнер
+```
+
+Обновление после изменений в коде:
+
+```sh
+git pull
+docker compose up -d --build      # пересобрать и перезапустить
+```
+
+`restart: unless-stopped` поднимет бота после краша и перезагрузки сервера. Чтобы ещё и
+авто-перезапускать «зависший» (unhealthy) контейнер — раскомментируй сервис `autoheal`
+в [docker-compose.yml](docker-compose.yml).
 
 ## Переменные окружения
 

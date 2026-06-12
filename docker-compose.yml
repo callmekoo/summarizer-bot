@@ -1,0 +1,32 @@
+services:
+  bot:
+    build: .
+    image: summarizer-bot
+    container_name: summarizer-bot
+    env_file: .env
+    restart: unless-stopped
+    # Ограничиваем логи, чтобы pino-json не забил диск на сервере.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # Метка для autoheal (см. опциональный сервис ниже).
+    labels:
+      autoheal: "true"
+
+  # --- Опционально: автоперезапуск по healthcheck ---------------------------
+  # restart: unless-stopped перезапускает контейнер, только когда процесс ВЫШЕЛ.
+  # Если бот «завис» (polling умер, но процесс жив) — Docker лишь пометит unhealthy,
+  # но НЕ перезапустит. autoheal следит за unhealthy-контейнерами и перезапускает их.
+  # Требует доступ к docker.sock (для личного сервера приемлемо). Раскомментируй при
+  # необходимости:
+  #
+  # autoheal:
+  #   image: willfarrell/autoheal:latest
+  #   container_name: autoheal
+  #   restart: unless-stopped
+  #   environment:
+  #     AUTOHEAL_CONTAINER_LABEL: autoheal
+  #   volumes:
+  #     - /var/run/docker.sock:/var/run/docker.sock
