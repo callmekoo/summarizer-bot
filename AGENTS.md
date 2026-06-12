@@ -45,7 +45,7 @@ src/
   middleware/       allowlist (ALLOWED_USER_IDS), rateLimit (RATE_LIMIT_PER_MIN)
   core/
     extractor.ts    rdrr.parse(url) с таймаутом + 3 ретрая; ошибки → ExtractError(kind)
-    summarizer.ts   один проход OpenRouter + обрезка по токенам + фолбэк-модель
+    summarizer.ts   один проход OpenRouter + обрезка + фолбэк; → {text, model, usage}
     formatter.ts    escape HTML → **bold**→<b> → разбивка ≤4096
   llm/              openrouter (клиент), prompts (русский, TL;DR + блоки)
   lib/              url, logger, concurrency (лимитер очереди), rateLimiter (окно)

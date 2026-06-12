@@ -156,7 +156,8 @@ src/
 
 ### Этап 4 — продакшн
 - [x] `Dockerfile` (multi-stage, non-root, only prod-deps) + `.dockerignore`
-- [ ] Метрики: одна строка-лог на запрос (`parseMs`, `llmMs`, `model`, `tokens`, `ok`)
+- [x] Метрики: одна строка-лог `request` на запрос (`ok`, `model`, `parseMs`, `llmMs`,
+  `totalMs`, `promptTokens`/`completionTokens`, `queuedAhead`, `reason` при ошибке)
 - [ ] Healthcheck — отложен: бот на polling, HTTP-порта нет. Появится вместе с webhook
   (или heartbeat-файл, если понадобится раньше)
 - [ ] Polling для старта; webhook — когда понадобится масштаб

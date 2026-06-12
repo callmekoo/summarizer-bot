@@ -13,6 +13,19 @@ export class SummarizeError extends Error {
   }
 }
 
+export interface TokenUsage {
+  prompt: number;
+  completion: number;
+  total: number;
+}
+
+export interface SummarizeResult {
+  text: string;
+  /** Какая модель в итоге ответила (основная или фолбэк). */
+  model: string;
+  usage?: TokenUsage;
+}
+
 // Потолок ожидания по Retry-After: дольше держать пользователя в «печатает…» не хотим.
 const MAX_RETRY_WAIT_MS = 30_000;
 
@@ -21,7 +34,7 @@ const MAX_RETRY_WAIT_MS = 30_000;
  * MAX_INPUT_TOKENS). Перебирает MODEL → MODEL_FALLBACK; при общем 429 (бесплатные
  * модели перегружены апстримом) один раз ждёт по Retry-After и повторяет цепочку.
  */
-export async function summarize(text: string, title?: string): Promise<string> {
+export async function summarize(text: string, title?: string): Promise<SummarizeResult> {
   const input = capTokens(text, config.MAX_INPUT_TOKENS);
   const models = [config.MODEL, config.MODEL_FALLBACK];
   const messages = [
@@ -40,7 +53,7 @@ export async function summarize(text: string, title?: string): Promise<string> {
       try {
         const resp = await openrouter.chat.completions.create({ model, temperature: 0.3, messages });
         const content = resp.choices[0]?.message?.content?.trim();
-        if (content) return content;
+        if (content) return { text: content, model, usage: mapUsage(resp.usage) };
         nOther++;
         logger.warn({ model }, 'пустой ответ модели, пробую следующую');
       } catch (err) {
@@ -83,6 +96,16 @@ export async function summarize(text: string, title?: string): Promise<string> {
 
 function httpStatus(err: unknown): number | undefined {
   return typeof err === 'object' && err !== null ? (err as { status?: number }).status : undefined;
+}
+
+/** Приводит usage из ответа OpenRouter к нашему виду (поля могут отсутствовать). */
+function mapUsage(usage: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } | undefined): TokenUsage | undefined {
+  if (!usage) return undefined;
+  return {
+    prompt: usage.prompt_tokens ?? 0,
+    completion: usage.completion_tokens ?? 0,
+    total: usage.total_tokens ?? 0,
+  };
 }
 
 /** Достаёт паузу до повтора из 429: сперва metadata, потом заголовок Retry-After. */

@@ -25,24 +25,70 @@ export async function onLink(ctx: Context): Promise<void> {
     ctx.replyWithChatAction('typing').catch(() => {});
   }, 4000);
 
+  const startedAt = Date.now();
+  const queuedAhead = pipeline.queued;
+  let parseMs = 0;
+  let llmMs = 0;
+
   try {
     await ctx.replyWithChatAction('typing');
-    const summary = await pipeline.run(async () => {
+    const result = await pipeline.run(async () => {
+      const tParse = Date.now();
       const extracted = await extract(url);
-      return summarize(extracted.markdown, extracted.title);
-    });
-    const html = toTelegramHtml(summary);
+      parseMs = Date.now() - tParse;
 
-    for (const chunk of splitForTelegram(html)) {
+      const tLlm = Date.now();
+      const summary = await summarize(extracted.markdown, extracted.title);
+      llmMs = Date.now() - tLlm;
+      return summary;
+    });
+
+    for (const chunk of splitForTelegram(toTelegramHtml(result.text))) {
       await ctx.reply(chunk, { parse_mode: 'HTML' });
     }
+
+    // Метрики: одна строка на успешный запрос.
+    logger.info(
+      {
+        url,
+        ok: true,
+        model: result.model,
+        parseMs,
+        llmMs,
+        totalMs: Date.now() - startedAt,
+        promptTokens: result.usage?.prompt,
+        completionTokens: result.usage?.completion,
+        queuedAhead,
+      },
+      'request',
+    );
   } catch (err) {
-    logger.error({ err, url }, 'не удалось сделать пересказ');
     await ctx.reply(userMessageForError(err));
+    // Метрики: одна строка на неуспешный запрос (err тоже логируем для деталей).
+    logger.error(
+      {
+        err,
+        url,
+        ok: false,
+        reason: errorReason(err),
+        parseMs,
+        llmMs,
+        totalMs: Date.now() - startedAt,
+        queuedAhead,
+      },
+      'request',
+    );
   } finally {
     clearInterval(typing);
     await ctx.api.deleteMessage(status.chat.id, status.message_id).catch(() => {});
   }
+}
+
+/** Короткий машиночитаемый код причины для метрик. */
+function errorReason(err: unknown): string {
+  if (err instanceof ExtractError) return `extract_${err.kind}`;
+  if (err instanceof SummarizeError) return `llm_${err.kind}`;
+  return 'unknown';
 }
 
 function userMessageForError(err: unknown): string {
