@@ -31,8 +31,8 @@ npm start
 |---|---|---|
 | `BOT_TOKEN` | токен Telegram-бота (от @BotFather) | — (обязательна) |
 | `OPENROUTER_API_KEY` | ключ OpenRouter | — (обязательна) |
-| `MODEL` | основная модель | `google/gemini-2.0-flash-exp:free` |
-| `MODEL_FALLBACK` | запасная модель | `deepseek/deepseek-chat:free` |
+| `MODEL` | основная модель | `meta-llama/llama-3.3-70b-instruct:free` |
+| `MODEL_FALLBACK` | запасная модель | `qwen/qwen3-next-80b-a3b-instruct:free` |
 | `MAX_INPUT_TOKENS` | лимит входных токенов | `100000` |
 | `RATE_LIMIT_PER_MIN` | лимит запросов/мин на пользователя (Этап 3) | `5` |
 | `LOG_LEVEL` | уровень логов pino | `info` |

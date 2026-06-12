@@ -1,7 +1,7 @@
 import type { Context } from 'grammy';
 import { extractUrl } from '../lib/url.js';
 import { extract, ExtractError } from '../core/extractor.js';
-import { summarize } from '../core/summarizer.js';
+import { summarize, SummarizeError } from '../core/summarizer.js';
 import { toTelegramHtml, splitForTelegram } from '../core/formatter.js';
 import { logger } from '../lib/logger.js';
 
@@ -47,6 +47,9 @@ function userMessageForError(err: unknown): string {
       default:
         return '⚠️ Не удалось открыть ссылку. Проверь, что она доступна.';
     }
+  }
+  if (err instanceof SummarizeError && err.kind === 'unavailable') {
+    return '🛠 Выбранная LLM-модель сейчас недоступна. Обнови MODEL в .env (см. список бесплатных моделей).';
   }
   return '⚠️ Что-то пошло не так при пересказе. Попробуй позже.';
 }
