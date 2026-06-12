@@ -4,6 +4,7 @@ import { logger } from './lib/logger.js';
 import { onStart } from './handlers/onStart.js';
 import { onLink } from './handlers/onLink.js';
 import { allowlist } from './middleware/allowlist.js';
+import { rateLimit } from './middleware/rateLimit.js';
 
 const bot = new Bot(config.BOT_TOKEN);
 
@@ -14,6 +15,7 @@ if (config.ALLOWED_USER_IDS.length === 0) {
 }
 
 bot.use(allowlist);
+bot.use(rateLimit);
 bot.command('start', onStart);
 bot.command('help', onStart);
 bot.on('message:text', onLink);

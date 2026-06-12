@@ -28,31 +28,54 @@ async function getParse(): Promise<ParseFn> {
   return parseFn;
 }
 
-/** Извлекает текст по ссылке через rdrr. Бросает ExtractError с понятной категорией. */
+const MAX_ATTEMPTS = 3;
+const BACKOFF_MS = 500;
+
+/**
+ * Извлекает текст по ссылке через rdrr. Бросает ExtractError с понятной категорией.
+ * Транзиентные сбои (сеть, таймаут) повторяются с backoff; пустой результат — нет
+ * (это не временная ошибка, а отсутствие текста).
+ */
 export async function extract(url: string): Promise<ExtractResult> {
-  let result: any;
-  try {
-    const parse = await getParse();
-    result = await withTimeout(parse(url), TIMEOUT_MS);
-  } catch (err) {
-    if (err instanceof ExtractError) throw err;
-    logger.error({ err, url }, 'rdrr parse failed');
-    throw new ExtractError('failed', 'не удалось извлечь текст по ссылке');
+  const parse = await getParse();
+  let lastErr: unknown;
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      const result: any = await withTimeout(parse(url), TIMEOUT_MS);
+
+      const markdown = String(result?.markdown ?? result?.content ?? '').trim();
+      if (!markdown) {
+        // Не ретраим: текста просто нет (пейвол, видео без субтитров и т.п.).
+        throw new ExtractError('empty', 'по ссылке не нашлось текста для пересказа');
+      }
+
+      const meta = result?.metadata ?? {};
+      return {
+        markdown,
+        title: result?.title ?? meta.title,
+        wordCount: result?.wordCount ?? meta.wordCount,
+        type: result?.type ?? meta.type,
+        url,
+      };
+    } catch (err) {
+      if (err instanceof ExtractError && err.kind === 'empty') throw err;
+      lastErr = err;
+      if (attempt < MAX_ATTEMPTS) {
+        logger.warn({ err, url, attempt }, 'rdrr: транзиентный сбой, повтор');
+        await sleep(BACKOFF_MS * attempt);
+      }
+    }
   }
 
-  const markdown = String(result?.markdown ?? result?.content ?? '').trim();
-  if (!markdown) {
-    throw new ExtractError('empty', 'по ссылке не нашлось текста для пересказа');
-  }
+  // Попытки исчерпаны.
+  if (lastErr instanceof ExtractError) throw lastErr; // таймаут
+  logger.error({ err: lastErr, url }, 'rdrr parse failed');
+  throw new ExtractError('failed', 'не удалось извлечь текст по ссылке');
+}
 
-  const meta = result?.metadata ?? {};
-  return {
-    markdown,
-    title: result?.title ?? meta.title,
-    wordCount: result?.wordCount ?? meta.wordCount,
-    type: result?.type ?? meta.type,
-    url,
-  };
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {

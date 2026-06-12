@@ -15,6 +15,7 @@ const schema = z.object({
   MODEL_FALLBACK: z.string().default('nvidia/nemotron-3-nano-30b-a3b:free'),
   MAX_INPUT_TOKENS: z.coerce.number().int().positive().default(100_000),
   RATE_LIMIT_PER_MIN: z.coerce.number().int().positive().default(5),
+  MAX_CONCURRENCY: z.coerce.number().int().positive().default(2),
   ALLOWED_USER_IDS: allowedUserIds,
   LOG_LEVEL: z.string().default('info'),
 });

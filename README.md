@@ -36,7 +36,8 @@ npm start
 | `MODEL` | основная модель | `nvidia/nemotron-3-super-120b-a12b:free` |
 | `MODEL_FALLBACK` | запасная модель | `nvidia/nemotron-3-nano-30b-a3b:free` |
 | `MAX_INPUT_TOKENS` | лимит входных токенов | `100000` |
-| `RATE_LIMIT_PER_MIN` | лимит запросов/мин на пользователя (Этап 3) | `5` |
+| `RATE_LIMIT_PER_MIN` | лимит запросов/мин на пользователя | `5` |
+| `MAX_CONCURRENCY` | одновременных обработок (parse + LLM) | `2` |
 | `ALLOWED_USER_IDS` | белый список Telegram ID через запятую (пусто = все) | — |
 | `LOG_LEVEL` | уровень логов pino | `info` |
 
@@ -57,10 +58,10 @@ src/
   bot.ts            точка входа
   config.ts         env + валидация (zod)
   handlers/         хендлеры Telegram (onStart, onLink)
-  middleware/       allowlist (ограничение по Telegram ID)
+  middleware/       allowlist (Telegram ID), rateLimit (запросов/мин)
   core/             extractor, summarizer, formatter
   llm/              клиент OpenRouter + промпты
-  lib/              url, logger
+  lib/              url, logger, concurrency, rateLimiter
   **/*.test.ts      юнит-тесты рядом с кодом (node:test)
 ```
 

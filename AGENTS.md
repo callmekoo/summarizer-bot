@@ -42,13 +42,13 @@ src/
   bot.ts            точка входа (grammY, graceful shutdown)
   config.ts         env + zod; падает с понятной ошибкой при невалидном .env
   handlers/         onStart (/start, /help), onLink (оркестрация пайплайна)
-  middleware/       allowlist (фильтр по ALLOWED_USER_IDS, до всех хендлеров)
+  middleware/       allowlist (ALLOWED_USER_IDS), rateLimit (RATE_LIMIT_PER_MIN)
   core/
-    extractor.ts    rdrr.parse(url) с таймаутом; ошибки → ExtractError(kind)
+    extractor.ts    rdrr.parse(url) с таймаутом + 3 ретрая; ошибки → ExtractError(kind)
     summarizer.ts   один проход OpenRouter + обрезка по токенам + фолбэк-модель
     formatter.ts    escape HTML → **bold**→<b> → разбивка ≤4096
   llm/              openrouter (клиент), prompts (русский, TL;DR + блоки)
-  lib/              url (извлечение ссылки), logger (pino)
+  lib/              url, logger, concurrency (лимитер очереди), rateLimiter (окно)
   types.ts
 ```
 

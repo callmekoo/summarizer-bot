@@ -3,7 +3,13 @@ import { extractUrl } from '../lib/url.js';
 import { extract, ExtractError } from '../core/extractor.js';
 import { summarize, SummarizeError } from '../core/summarizer.js';
 import { toTelegramHtml, splitForTelegram } from '../core/formatter.js';
+import { createLimiter } from '../lib/concurrency.js';
+import { config } from '../config.js';
 import { logger } from '../lib/logger.js';
+
+// Глобальный лимит одновременных тяжёлых обработок (parse + LLM): защищает от
+// шторма 429 при нескольких ссылках подряд. Лишние ждут в очереди.
+const pipeline = createLimiter(config.MAX_CONCURRENCY);
 
 export async function onLink(ctx: Context): Promise<void> {
   const text = ctx.message?.text ?? '';
@@ -21,8 +27,10 @@ export async function onLink(ctx: Context): Promise<void> {
 
   try {
     await ctx.replyWithChatAction('typing');
-    const extracted = await extract(url);
-    const summary = await summarize(extracted.markdown, extracted.title);
+    const summary = await pipeline.run(async () => {
+      const extracted = await extract(url);
+      return summarize(extracted.markdown, extracted.title);
+    });
     const html = toTelegramHtml(summary);
 
     for (const chunk of splitForTelegram(html)) {
