@@ -161,9 +161,11 @@ src/
 - [x] `Dockerfile` (multi-stage, non-root, only prod-deps) + `.dockerignore`
 - [x] Метрики: одна строка-лог `request` на запрос (`ok`, `model`, `parseMs`, `llmMs`,
   `totalMs`, `promptTokens`/`completionTokens`, `queuedAhead`, `reason` при ошибке)
-- [ ] Healthcheck — отложен: бот на polling, HTTP-порта нет. Появится вместе с webhook
-  (или heartbeat-файл, если понадобится раньше)
+- [x] Healthcheck (heartbeat-файл): бот обновляет `HEARTBEAT_FILE`, пока опрашивает
+  Telegram; `HEALTHCHECK` в Dockerfile считает unhealthy при «протухании» > 60 с
 - [ ] Polling для старта; webhook — когда понадобится масштаб
+- [ ] **При добавлении webhook — переделать healthcheck на HTTP `/health`** (вебхук и так
+  поднимает HTTP-сервер; heartbeat-файл тогда убрать)
 - [ ] (Опц.) SQLite-кэш по URL — не пересуммаризировать одинаковые ссылки
 - **Готово, когда:** сервис собирается в образ и крутится в проде.
 

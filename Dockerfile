@@ -24,4 +24,9 @@ COPY --from=build /app/dist ./dist
 # Запускаемся под непривилегированным пользователем node (есть в образе).
 USER node
 
+# Healthcheck по heartbeat-файлу: бот обновляет его, пока опрашивает Telegram.
+# Свежий файл (< 60 с) = healthy. HEARTBEAT_FILE должен совпадать с тем, что в config.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD node -e "const f=process.env.HEARTBEAT_FILE||'/tmp/heartbeat';const{statSync}=require('node:fs');process.exit(Date.now()-statSync(f).mtimeMs<60000?0:1)"
+
 CMD ["node", "dist/bot.js"]

@@ -39,6 +39,16 @@ docker run --rm --env-file .env summarizer-bot
 
 Секреты передаются через `--env-file` (`.env` в образ не копируется, см. `.dockerignore`).
 
+**Healthcheck.** Бот пишет heartbeat-файл (`HEARTBEAT_FILE`), пока опрашивает Telegram;
+`HEALTHCHECK` в образе считает контейнер `unhealthy`, если файл «протух» (> 60 с). Сам по
+себе Docker только помечает статус — для автоперезапуска нужна политика, например:
+
+```sh
+docker run -d --restart unless-stopped --env-file .env summarizer-bot
+```
+
+(При переходе на webhook healthcheck заменим на HTTP `/health` — см. PLAN, Этап 4.)
+
 ## Переменные окружения
 
 | Переменная | Назначение | По умолчанию |
@@ -51,6 +61,7 @@ docker run --rm --env-file .env summarizer-bot
 | `RATE_LIMIT_PER_MIN` | лимит запросов/мин на пользователя | `5` |
 | `MAX_CONCURRENCY` | одновременных обработок (parse + LLM) | `2` |
 | `ALLOWED_USER_IDS` | белый список Telegram ID через запятую (пусто = все) | — |
+| `HEARTBEAT_FILE` | файл heartbeat для Docker healthcheck | `/tmp/heartbeat` |
 | `LOG_LEVEL` | уровень логов pino | `info` |
 
 Свой Telegram ID — у [@userinfobot](https://t.me/userinfobot). Пустой `ALLOWED_USER_IDS`

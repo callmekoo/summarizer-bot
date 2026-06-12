@@ -1,3 +1,4 @@
+import { writeFileSync } from 'node:fs';
 import { Bot } from 'grammy';
 import { config } from './config.js';
 import { logger } from './lib/logger.js';
@@ -24,9 +25,32 @@ bot.catch((err) => {
   logger.error({ err: err.error }, 'необработанная ошибка бота');
 });
 
-process.once('SIGINT', () => bot.stop());
-process.once('SIGTERM', () => bot.stop());
+// Heartbeat для Docker healthcheck: обновляем mtime файла, пока бот реально опрашивает
+// Telegram. Если polling умрёт — файл «протухнет» и контейнер пометится unhealthy.
+const HEARTBEAT_INTERVAL_MS = 15_000;
+
+function writeHeartbeat(): void {
+  try {
+    writeFileSync(config.HEARTBEAT_FILE, String(Date.now()));
+  } catch (err) {
+    logger.warn({ err, file: config.HEARTBEAT_FILE }, 'не удалось записать heartbeat');
+  }
+}
+
+const heartbeat = setInterval(() => {
+  if (bot.isRunning()) writeHeartbeat();
+}, HEARTBEAT_INTERVAL_MS);
+
+const shutdown = (): void => {
+  clearInterval(heartbeat);
+  void bot.stop();
+};
+process.once('SIGINT', shutdown);
+process.once('SIGTERM', shutdown);
 
 bot.start({
-  onStart: (me) => logger.info({ username: me.username }, 'бот запущен'),
+  onStart: (me) => {
+    writeHeartbeat();
+    logger.info({ username: me.username }, 'бот запущен');
+  },
 });

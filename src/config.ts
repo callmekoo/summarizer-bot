@@ -17,6 +17,7 @@ const schema = z.object({
   RATE_LIMIT_PER_MIN: z.coerce.number().int().positive().default(5),
   MAX_CONCURRENCY: z.coerce.number().int().positive().default(2),
   ALLOWED_USER_IDS: allowedUserIds,
+  HEARTBEAT_FILE: z.string().default('/tmp/heartbeat'),
   LOG_LEVEL: z.string().default('info'),
 });
 
