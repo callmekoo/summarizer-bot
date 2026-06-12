@@ -1,6 +1,13 @@
 import 'dotenv/config';
 import { z } from 'zod';
 
+// Список Telegram user ID через запятую → массив чисел. Пустой = allowlist выключен.
+const allowedUserIds = z
+  .string()
+  .default('')
+  .transform((s) => s.split(',').map((x) => x.trim()).filter(Boolean))
+  .pipe(z.array(z.coerce.number().int().positive()));
+
 const schema = z.object({
   BOT_TOKEN: z.string().min(1, 'BOT_TOKEN обязателен'),
   OPENROUTER_API_KEY: z.string().min(1, 'OPENROUTER_API_KEY обязателен'),
@@ -8,6 +15,7 @@ const schema = z.object({
   MODEL_FALLBACK: z.string().default('nvidia/nemotron-3-nano-30b-a3b:free'),
   MAX_INPUT_TOKENS: z.coerce.number().int().positive().default(100_000),
   RATE_LIMIT_PER_MIN: z.coerce.number().int().positive().default(5),
+  ALLOWED_USER_IDS: allowedUserIds,
   LOG_LEVEL: z.string().default('info'),
 });
 

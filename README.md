@@ -35,7 +35,11 @@ npm start
 | `MODEL_FALLBACK` | запасная модель | `nvidia/nemotron-3-nano-30b-a3b:free` |
 | `MAX_INPUT_TOKENS` | лимит входных токенов | `100000` |
 | `RATE_LIMIT_PER_MIN` | лимит запросов/мин на пользователя (Этап 3) | `5` |
+| `ALLOWED_USER_IDS` | белый список Telegram ID через запятую (пусто = все) | — |
 | `LOG_LEVEL` | уровень логов pino | `info` |
+
+Свой Telegram ID — у [@userinfobot](https://t.me/userinfobot). Пустой `ALLOWED_USER_IDS`
+= бот открыт всем (на старте пишет предупреждение в лог).
 
 Живой список бесплатных моделей OpenRouter:
 
@@ -51,6 +55,7 @@ src/
   bot.ts            точка входа
   config.ts         env + валидация (zod)
   handlers/         хендлеры Telegram (onStart, onLink)
+  middleware/       allowlist (ограничение по Telegram ID)
   core/             extractor, summarizer, formatter
   llm/              клиент OpenRouter + промпты
   lib/              url, logger
