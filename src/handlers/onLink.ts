@@ -2,7 +2,8 @@ import type { Context } from 'grammy';
 import { extractUrl } from '../lib/url.js';
 import { extract, ExtractError } from '../core/extractor.js';
 import { summarize, SummarizeError } from '../core/summarizer.js';
-import { toTelegramHtml, splitForTelegram } from '../core/formatter.js';
+import { toTelegramHtml, splitForTelegram, renderSourceHeader } from '../core/formatter.js';
+import type { ExtractResult } from '../types.js';
 import { createLimiter } from '../lib/concurrency.js';
 import { config } from '../config.js';
 import { logger } from '../lib/logger.js';
@@ -30,11 +31,12 @@ export async function onLink(ctx: Context): Promise<void> {
   let parseMs = 0;
   let llmMs = 0;
 
+  let extracted: ExtractResult | undefined;
   try {
     await ctx.replyWithChatAction('typing');
     const result = await pipeline.run(async () => {
       const tParse = Date.now();
-      const extracted = await extract(url);
+      extracted = await extract(url);
       parseMs = Date.now() - tParse;
 
       const tLlm = Date.now();
@@ -43,8 +45,17 @@ export async function onLink(ctx: Context): Promise<void> {
       return summary;
     });
 
-    for (const chunk of splitForTelegram(toTelegramHtml(result.text))) {
-      await ctx.reply(chunk, { parse_mode: 'HTML' });
+    const header = renderSourceHeader({
+      url,
+      title: extracted?.title,
+      author: extracted?.author,
+      site: extracted?.site,
+    });
+    const body = toTelegramHtml(result.text);
+    const message = header ? `${header}\n\n${body}` : body;
+
+    for (const chunk of splitForTelegram(message)) {
+      await ctx.reply(chunk, { parse_mode: 'HTML', link_preview_options: { is_disabled: true } });
     }
 
     // Метрики: одна строка на успешный запрос.

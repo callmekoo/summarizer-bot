@@ -5,6 +5,37 @@ function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+/** Экранирование для значения HTML-атрибута (href). */
+function escapeAttr(s: string): string {
+  return escapeHtml(s).replace(/"/g, '&quot;');
+}
+
+export interface SourceMeta {
+  url: string;
+  title?: string;
+  author?: string;
+  site?: string;
+}
+
+/**
+ * Шапка с источником над пересказом: кликабельный заголовок-ссылка, затем сайт и автор.
+ * Возвращает '' если выводить нечего. Все поля экранируются.
+ */
+export function renderSourceHeader(meta: SourceMeta): string {
+  const lines: string[] = [];
+
+  if (meta.title) {
+    lines.push(`<a href="${escapeAttr(meta.url)}"><b>${escapeHtml(meta.title)}</b></a>`);
+  }
+
+  const sub: string[] = [];
+  if (meta.site) sub.push(`🌐 ${escapeHtml(meta.site)}`);
+  if (meta.author) sub.push(`✍️ ${escapeHtml(meta.author)}`);
+  if (sub.length) lines.push(sub.join(' · '));
+
+  return lines.join('\n');
+}
+
 /**
  * Превращает ответ модели в безопасный Telegram-HTML.
  * Модель размечает заголовки блоков как **жирный** — сначала всё экранируем,

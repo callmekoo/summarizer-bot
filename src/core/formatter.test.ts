@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { toTelegramHtml, splitForTelegram } from './formatter.js';
+import { toTelegramHtml, splitForTelegram, renderSourceHeader } from './formatter.js';
 
 test('toTelegramHtml экранирует спецсимволы HTML', () => {
   const out = toTelegramHtml('теги <div> и & «амперсанд» > конец');
@@ -45,4 +45,35 @@ test('splitForTelegram жёстко режет одиночную строку �
 test('splitForTelegram: текст ровно по лимиту не режется', () => {
   const text = 'a'.repeat(10);
   assert.deepEqual(splitForTelegram(text, 10), [text]);
+});
+
+test('renderSourceHeader: заголовок-ссылка + сайт + автор', () => {
+  const h = renderSourceHeader({
+    url: 'https://habr.com/p/1',
+    title: 'Заголовок',
+    author: 'Иван',
+    site: 'Хабр',
+  });
+  assert.equal(h, '<a href="https://habr.com/p/1"><b>Заголовок</b></a>\n🌐 Хабр · ✍️ Иван');
+});
+
+test('renderSourceHeader экранирует html в полях и href', () => {
+  const h = renderSourceHeader({
+    url: 'https://x.test/?a=1&b=2',
+    title: 'A <b> & "C"',
+    site: 'Site & Co',
+  });
+  assert.ok(h.includes('href="https://x.test/?a=1&amp;b=2"'), 'амперсанд в href экранирован');
+  // В тексте элемента экранируем только < > &; кавычки внутри текста допустимы как есть.
+  assert.ok(h.includes('<b>A &lt;b&gt; &amp; "C"</b>'), 'текст заголовка экранирован');
+  assert.ok(h.includes('🌐 Site &amp; Co'));
+  assert.ok(!h.includes('✍️'), 'автора нет — строка без него');
+});
+
+test('renderSourceHeader: только сайт, без заголовка', () => {
+  assert.equal(renderSourceHeader({ url: 'https://x.test', site: 'X' }), '🌐 X');
+});
+
+test('renderSourceHeader: нет метаданных → пустая строка', () => {
+  assert.equal(renderSourceHeader({ url: 'https://x.test' }), '');
 });

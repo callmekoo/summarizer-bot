@@ -46,7 +46,7 @@ src/
   core/
     extractor.ts    rdrr.parse(url) с таймаутом + 3 ретрая; ошибки → ExtractError(kind)
     summarizer.ts   один проход OpenRouter + обрезка + фолбэк; → {text, model, usage}
-    formatter.ts    escape HTML → **bold**→<b> → разбивка ≤4096
+    formatter.ts    escape HTML → **bold**→<b> → разбивка ≤4096; шапка источника
   llm/              openrouter (клиент), prompts (русский, TL;DR + блоки)
   lib/              url, logger, concurrency (лимитер очереди), rateLimiter (окно)
   types.ts

@@ -51,9 +51,16 @@ export async function extract(url: string): Promise<ExtractResult> {
       }
 
       const meta = result?.metadata ?? {};
+      // rdrr иногда отдаёт пустые строки — превращаем их в undefined.
+      const clean = (v: unknown): string | undefined => {
+        const s = typeof v === 'string' ? v.trim() : '';
+        return s || undefined;
+      };
       return {
         markdown,
-        title: result?.title ?? meta.title,
+        title: clean(result?.title ?? meta.title),
+        author: clean(result?.author ?? meta.author),
+        site: clean(result?.siteName ?? result?.domain ?? meta.siteName ?? meta.domain),
         wordCount: result?.wordCount ?? meta.wordCount,
         type: result?.type ?? meta.type,
         url,
