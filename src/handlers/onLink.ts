@@ -1,0 +1,52 @@
+import type { Context } from 'grammy';
+import { extractUrl } from '../lib/url.js';
+import { extract, ExtractError } from '../core/extractor.js';
+import { summarize } from '../core/summarizer.js';
+import { toTelegramHtml, splitForTelegram } from '../core/formatter.js';
+import { logger } from '../lib/logger.js';
+
+export async function onLink(ctx: Context): Promise<void> {
+  const text = ctx.message?.text ?? '';
+  const url = extractUrl(text);
+  if (!url) {
+    await ctx.reply('Пришли ссылку (http/https) на статью или YouTube-видео.');
+    return;
+  }
+
+  const status = await ctx.reply('⏳ Обрабатываю ссылку…');
+  // Держим индикатор «печатает», пока идёт парсинг + запрос к LLM.
+  const typing = setInterval(() => {
+    ctx.replyWithChatAction('typing').catch(() => {});
+  }, 4000);
+
+  try {
+    await ctx.replyWithChatAction('typing');
+    const extracted = await extract(url);
+    const summary = await summarize(extracted.markdown, extracted.title);
+    const html = toTelegramHtml(summary);
+
+    for (const chunk of splitForTelegram(html)) {
+      await ctx.reply(chunk, { parse_mode: 'HTML' });
+    }
+  } catch (err) {
+    logger.error({ err, url }, 'не удалось сделать пересказ');
+    await ctx.reply(userMessageForError(err));
+  } finally {
+    clearInterval(typing);
+    await ctx.api.deleteMessage(status.chat.id, status.message_id).catch(() => {});
+  }
+}
+
+function userMessageForError(err: unknown): string {
+  if (err instanceof ExtractError) {
+    switch (err.kind) {
+      case 'empty':
+        return '😕 По этой ссылке не нашлось текста для пересказа.';
+      case 'timeout':
+        return '⌛ Извлечение текста заняло слишком долго. Попробуй ещё раз.';
+      default:
+        return '⚠️ Не удалось открыть ссылку. Проверь, что она доступна.';
+    }
+  }
+  return '⚠️ Что-то пошло не так при пересказе. Попробуй позже.';
+}
