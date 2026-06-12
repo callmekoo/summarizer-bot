@@ -5,6 +5,23 @@
 
 Полный план и принятые решения — в [PLAN.md](PLAN.md). Запуск — в [README.md](README.md).
 
+## Старт за 30 секунд
+
+```sh
+# 1. Node только через nvm — добавь в PATH в КАЖДОМ bash-вызове (state не персистится):
+export PATH="$HOME/.nvm/versions/node/v22.22.3/bin:$PATH"
+
+# 2. Зависимости (если ещё не стоят) и проверка, что всё зелёное:
+npm install
+npm run check          # typecheck + тесты — запускай после каждого изменения
+
+# 3. Запуск бота (нужен заполненный .env, см. README):
+npm run dev
+```
+
+Что делать дальше — открытые пункты в [PLAN.md](PLAN.md) (Этап 4: webhook, SQLite-кэш).
+Перед коммитом: `npm run check` зелёный + обнови PLAN/README/AGENTS, если менял поведение.
+
 ## Стек
 
 - **TypeScript / Node.js 20+**, ESM (`"type": "module"`, `module: NodeNext`).
@@ -21,11 +38,10 @@
 npm run dev        # tsx watch — разработка
 npm run typecheck  # tsc --noEmit (включая тесты)
 npm test           # node:test через tsx — юнит-тесты (src/**/*.test.ts)
+npm run check      # typecheck + test одной командой (запускай перед коммитом)
 npm run build      # tsc -p tsconfig.build.json → dist/ (без *.test.ts)
 npm start          # node dist/bot.js (прод)
 ```
-
-Перед коммитом прогоняй `npm run typecheck` и `npm test`.
 
 **Тесты:** встроенный `node:test` + `node:assert`, без внешних зависимостей. Файлы
 рядом с кодом (`*.test.ts`). Покрыты чистые модули (formatter, url, allowlist, парсинг
