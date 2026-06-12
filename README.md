@@ -27,6 +27,18 @@ npm run build
 npm start
 ```
 
+## Docker
+
+Multi-stage сборка (build → runtime, в образе только прод-зависимости), запуск под
+непривилегированным пользователем. Бот работает по long-polling — входящий порт не нужен.
+
+```sh
+docker build -t summarizer-bot .
+docker run --rm --env-file .env summarizer-bot
+```
+
+Секреты передаются через `--env-file` (`.env` в образ не копируется, см. `.dockerignore`).
+
 ## Переменные окружения
 
 | Переменная | Назначение | По умолчанию |
