@@ -18,9 +18,11 @@ cp .env.example .env   # заполнить BOT_TOKEN и OPENROUTER_API_KEY
 npm run dev            # режим разработки (tsx watch)
 ```
 
-Сборка и прод:
+Тесты и сборка:
 
 ```sh
+npm test           # юнит-тесты (node:test через tsx)
+npm run typecheck  # проверка типов
 npm run build
 npm start
 ```
@@ -59,6 +61,7 @@ src/
   core/             extractor, summarizer, formatter
   llm/              клиент OpenRouter + промпты
   lib/              url, logger
+  **/*.test.ts      юнит-тесты рядом с кодом (node:test)
 ```
 
 ## Статус

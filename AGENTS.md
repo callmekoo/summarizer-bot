@@ -19,12 +19,18 @@
 
 ```sh
 npm run dev        # tsx watch — разработка
-npm run typecheck  # tsc --noEmit
-npm run build      # tsc → dist/
+npm run typecheck  # tsc --noEmit (включая тесты)
+npm test           # node:test через tsx — юнит-тесты (src/**/*.test.ts)
+npm run build      # tsc -p tsconfig.build.json → dist/ (без *.test.ts)
 npm start          # node dist/bot.js (прод)
 ```
 
-Перед коммитом прогоняй `npm run typecheck`.
+Перед коммитом прогоняй `npm run typecheck` и `npm test`.
+
+**Тесты:** встроенный `node:test` + `node:assert`, без внешних зависимостей. Файлы
+рядом с кодом (`*.test.ts`). Покрыты чистые модули (formatter, url, allowlist, парсинг
+config). Сетевые вызовы (rdrr, OpenRouter) в юнит-тестах не дёргаем — для них чистую
+логику выносим в тестируемые функции (напр. `isAllowed`, `retryAfterMs`).
 
 ## Архитектура
 

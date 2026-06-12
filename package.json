@@ -8,9 +8,10 @@
   },
   "scripts": {
     "dev": "tsx watch src/bot.ts",
-    "build": "tsc",
+    "build": "tsc -p tsconfig.build.json",
     "start": "node dist/bot.js",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test \"src/**/*.test.ts\""
   },
   "dependencies": {
     "dotenv": "^16.4.5",
