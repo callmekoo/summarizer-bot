@@ -24,6 +24,10 @@ export interface SummarizeResult {
   /** Какая модель в итоге ответила (основная или фолбэк). */
   model: string;
   usage?: TokenUsage;
+  /** Текст был длиннее лимита и обрезан. */
+  truncated: boolean;
+  /** Какая доля исходного текста вошла в пересказ, % (100, если без обрезки). */
+  keptPercent: number;
 }
 
 // Потолок ожидания по Retry-After: дольше держать пользователя в «печатает…» не хотим.
@@ -35,11 +39,11 @@ const MAX_RETRY_WAIT_MS = 30_000;
  * модели перегружены апстримом) один раз ждёт по Retry-After и повторяет цепочку.
  */
 export async function summarize(text: string, title?: string): Promise<SummarizeResult> {
-  const input = capTokens(text, config.MAX_INPUT_TOKENS);
+  const cap = capTokens(text, config.MAX_INPUT_TOKENS);
   const models = [config.MODEL, config.MODEL_FALLBACK];
   const messages = [
     { role: 'system' as const, content: SYSTEM_PROMPT },
-    { role: 'user' as const, content: userPrompt(title, input) },
+    { role: 'user' as const, content: userPrompt(title, cap.text) },
   ];
 
   for (let attempt = 0; ; attempt++) {
@@ -53,7 +57,15 @@ export async function summarize(text: string, title?: string): Promise<Summarize
       try {
         const resp = await openrouter.chat.completions.create({ model, temperature: 0.3, messages });
         const content = resp.choices[0]?.message?.content?.trim();
-        if (content) return { text: content, model, usage: mapUsage(resp.usage) };
+        if (content) {
+          return {
+            text: content,
+            model,
+            usage: mapUsage(resp.usage),
+            truncated: cap.truncated,
+            keptPercent: cap.keptPercent,
+          };
+        }
         nOther++;
         logger.warn({ model }, 'пустой ответ модели, пробую следующую');
       } catch (err) {
@@ -121,11 +133,23 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+export interface CapResult {
+  text: string;
+  truncated: boolean;
+  keptPercent: number;
+}
+
 /** Обрезает текст под бюджет токенов (грубо, пропорционально по символам). */
-function capTokens(text: string, maxTokens: number): string {
+export function capTokens(text: string, maxTokens: number): CapResult {
   const tokenCount = encode(text).length;
-  if (tokenCount <= maxTokens) return text;
+  if (tokenCount <= maxTokens) {
+    return { text, truncated: false, keptPercent: 100 };
+  }
   const ratio = maxTokens / tokenCount;
   logger.warn({ tokenCount, maxTokens }, 'текст превышает лимит токенов, обрезаю');
-  return text.slice(0, Math.floor(text.length * ratio));
+  return {
+    text: text.slice(0, Math.floor(text.length * ratio)),
+    truncated: true,
+    keptPercent: Math.round(ratio * 100),
+  };
 }

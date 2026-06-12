@@ -13,7 +13,7 @@ const schema = z.object({
   OPENROUTER_API_KEY: z.string().min(1, 'OPENROUTER_API_KEY обязателен'),
   MODEL: z.string().default('nvidia/nemotron-3-super-120b-a12b:free'),
   MODEL_FALLBACK: z.string().default('nvidia/nemotron-3-nano-30b-a3b:free'),
-  MAX_INPUT_TOKENS: z.coerce.number().int().positive().default(100_000),
+  MAX_INPUT_TOKENS: z.coerce.number().int().positive().default(200_000),
   RATE_LIMIT_PER_MIN: z.coerce.number().int().positive().default(5),
   MAX_CONCURRENCY: z.coerce.number().int().positive().default(2),
   ALLOWED_USER_IDS: allowedUserIds,

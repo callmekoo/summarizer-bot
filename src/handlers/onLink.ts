@@ -51,8 +51,11 @@ export async function onLink(ctx: Context): Promise<void> {
       author: extracted?.author,
       site: extracted?.site,
     });
+    const notice = result.truncated
+      ? `⚠️ Текст очень длинный — в пересказ вошли первые ~${result.keptPercent}%.`
+      : '';
     const body = toTelegramHtml(result.text);
-    const message = header ? `${header}\n\n${body}` : body;
+    const message = [header, notice, body].filter(Boolean).join('\n\n');
 
     for (const chunk of splitForTelegram(message)) {
       await ctx.reply(chunk, { parse_mode: 'HTML', link_preview_options: { is_disabled: true } });
@@ -69,6 +72,7 @@ export async function onLink(ctx: Context): Promise<void> {
         totalMs: Date.now() - startedAt,
         promptTokens: result.usage?.prompt,
         completionTokens: result.usage?.completion,
+        truncated: result.truncated,
         queuedAhead,
       },
       'request',

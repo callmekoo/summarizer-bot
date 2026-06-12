@@ -47,7 +47,7 @@ docker run --rm --env-file .env summarizer-bot
 | `OPENROUTER_API_KEY` | ключ OpenRouter | — (обязательна) |
 | `MODEL` | основная модель | `nvidia/nemotron-3-super-120b-a12b:free` |
 | `MODEL_FALLBACK` | запасная модель | `nvidia/nemotron-3-nano-30b-a3b:free` |
-| `MAX_INPUT_TOKENS` | лимит входных токенов | `100000` |
+| `MAX_INPUT_TOKENS` | лимит входных токенов (свыше — обрезка + предупреждение) | `200000` |
 | `RATE_LIMIT_PER_MIN` | лимит запросов/мин на пользователя | `5` |
 | `MAX_CONCURRENCY` | одновременных обработок (parse + LLM) | `2` |
 | `ALLOWED_USER_IDS` | белый список Telegram ID через запятую (пусто = все) | — |
