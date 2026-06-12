@@ -48,8 +48,13 @@ function userMessageForError(err: unknown): string {
         return '⚠️ Не удалось открыть ссылку. Проверь, что она доступна.';
     }
   }
-  if (err instanceof SummarizeError && err.kind === 'unavailable') {
-    return '🛠 Выбранная LLM-модель сейчас недоступна. Обнови MODEL в .env (см. список бесплатных моделей).';
+  if (err instanceof SummarizeError) {
+    if (err.kind === 'unavailable') {
+      return '🛠 Выбранная LLM-модель сейчас недоступна. Обнови MODEL в .env (см. список бесплатных моделей).';
+    }
+    if (err.kind === 'rate_limited') {
+      return '🚦 Бесплатные модели сейчас перегружены. Попробуй ещё раз через минуту.';
+    }
   }
   return '⚠️ Что-то пошло не так при пересказе. Попробуй позже.';
 }

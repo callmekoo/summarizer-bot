@@ -4,7 +4,7 @@ import { SYSTEM_PROMPT, userPrompt } from '../llm/prompts.js';
 import { config } from '../config.js';
 import { logger } from '../lib/logger.js';
 
-export type SummarizeErrorKind = 'unavailable' | 'failed';
+export type SummarizeErrorKind = 'unavailable' | 'rate_limited' | 'failed';
 
 export class SummarizeError extends Error {
   constructor(public readonly kind: SummarizeErrorKind, message: string) {
@@ -13,52 +13,89 @@ export class SummarizeError extends Error {
   }
 }
 
+// Потолок ожидания по Retry-After: дольше держать пользователя в «печатает…» не хотим.
+const MAX_RETRY_WAIT_MS = 30_000;
+
 /**
- * Суммаризирует текст одним проходом. Основная модель вмещает ~1M токенов,
- * поэтому пока без map-reduce — только защитная обрезка по MAX_INPUT_TOKENS.
- * Перебирает MODEL → MODEL_FALLBACK при ошибке/пустом ответе.
+ * Суммаризирует текст одним проходом (без map-reduce — пока хватает обрезки по
+ * MAX_INPUT_TOKENS). Перебирает MODEL → MODEL_FALLBACK; при общем 429 (бесплатные
+ * модели перегружены апстримом) один раз ждёт по Retry-After и повторяет цепочку.
  */
 export async function summarize(text: string, title?: string): Promise<string> {
   const input = capTokens(text, config.MAX_INPUT_TOKENS);
   const models = [config.MODEL, config.MODEL_FALLBACK];
+  const messages = [
+    { role: 'system' as const, content: SYSTEM_PROMPT },
+    { role: 'user' as const, content: userPrompt(title, input) },
+  ];
 
-  let lastErr: unknown;
-  let allUnavailable = true;
-  for (const model of models) {
-    try {
-      const resp = await openrouter.chat.completions.create({
-        model,
-        temperature: 0.3,
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: userPrompt(title, input) },
-        ],
-      });
-      const content = resp.choices[0]?.message?.content?.trim();
-      if (content) return content;
-      allUnavailable = false;
-      logger.warn({ model }, 'пустой ответ модели, пробую следующую');
-    } catch (err) {
-      lastErr = err;
-      if (!isModelUnavailable(err)) allUnavailable = false;
-      logger.warn({ err, model }, 'ошибка запроса к модели, пробую следующую');
+  for (let attempt = 0; ; attempt++) {
+    let lastErr: unknown;
+    let n404 = 0;
+    let n429 = 0;
+    let nOther = 0;
+    let minRetryAfterMs = Infinity;
+
+    for (const model of models) {
+      try {
+        const resp = await openrouter.chat.completions.create({ model, temperature: 0.3, messages });
+        const content = resp.choices[0]?.message?.content?.trim();
+        if (content) return content;
+        nOther++;
+        logger.warn({ model }, 'пустой ответ модели, пробую следующую');
+      } catch (err) {
+        lastErr = err;
+        const status = httpStatus(err);
+        if (status === 404) {
+          n404++;
+        } else if (status === 429) {
+          n429++;
+          minRetryAfterMs = Math.min(minRetryAfterMs, retryAfterMs(err));
+        } else {
+          nOther++;
+        }
+        logger.warn({ err, model }, 'ошибка запроса к модели, пробую следующую');
+      }
     }
-  }
 
-  // Все модели отвалились по 404 «нет такой/недоступна бесплатно» — это протухший
-  // слаг в .env, а не временный сбой. Сообщаем об этом отдельно.
-  if (allUnavailable) {
-    throw new SummarizeError(
-      'unavailable',
-      `модели недоступны: ${models.join(', ')} — обнови MODEL/MODEL_FALLBACK в .env`,
-    );
+    // Только 429 по всем моделям — апстрим временно перегружен. Один раз ждём и повторяем.
+    const allRateLimited = n429 > 0 && n404 === 0 && nOther === 0;
+    if (allRateLimited && attempt === 0 && Number.isFinite(minRetryAfterMs)) {
+      const waitMs = Math.min(minRetryAfterMs, MAX_RETRY_WAIT_MS);
+      logger.warn({ waitMs }, 'все модели перегружены (429), жду и повторяю');
+      await sleep(waitMs);
+      continue;
+    }
+    if (allRateLimited) {
+      throw new SummarizeError('rate_limited', `все модели перегружены (429): ${models.join(', ')}`);
+    }
+
+    // Только 404 — слаги протухли/стали платными, это правка .env, а не временный сбой.
+    if (n404 > 0 && n429 === 0 && nOther === 0) {
+      throw new SummarizeError(
+        'unavailable',
+        `модели недоступны: ${models.join(', ')} — обнови MODEL/MODEL_FALLBACK в .env`,
+      );
+    }
+    throw new SummarizeError('failed', `LLM summarization failed: ${String(lastErr)}`);
   }
-  throw new SummarizeError('failed', `LLM summarization failed: ${String(lastErr)}`);
 }
 
-/** OpenRouter возвращает 404, когда слаг модели не существует или больше не бесплатен. */
-function isModelUnavailable(err: unknown): boolean {
-  return typeof err === 'object' && err !== null && (err as { status?: number }).status === 404;
+function httpStatus(err: unknown): number | undefined {
+  return typeof err === 'object' && err !== null ? (err as { status?: number }).status : undefined;
+}
+
+/** Достаёт паузу до повтора из 429: сперва metadata, потом заголовок Retry-After. */
+function retryAfterMs(err: unknown): number {
+  const e = err as { headers?: Record<string, string>; error?: { metadata?: { retry_after_seconds?: number } } };
+  const metaSec = e?.error?.metadata?.retry_after_seconds;
+  const headerSec = Number(e?.headers?.['retry-after']);
+  const sec = Number.isFinite(metaSec) ? Number(metaSec) : headerSec;
+  return Number.isFinite(sec) && sec > 0 ? sec * 1000 : 5000;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /** Обрезает текст под бюджет токенов (грубо, пропорционально по символам). */
