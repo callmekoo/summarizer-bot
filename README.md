@@ -93,8 +93,8 @@ docker compose up -d --build      # пересобрать и перезапус
 | `BOT_TOKEN` | токен Telegram-бота (от @BotFather) | — (обязательна) |
 | `LLM_API_KEY` | ключ LLM-провайдера (или старый `OPENROUTER_API_KEY`) | — (обязательна) |
 | `LLM_BASE_URL` | baseURL OpenAI-совместимого API | `https://openrouter.ai/api/v1` |
-| `MODEL` | основная модель | `nvidia/nemotron-3-super-120b-a12b:free` |
-| `MODEL_FALLBACK` | запасная модель | `nvidia/nemotron-3-nano-30b-a3b:free` |
+| `MODEL` | основная модель (slug провайдера) | — (обязательна) |
+| `MODEL_FALLBACK` | запасная модель (при ошибке/429 основной) | — (опционально) |
 | `LLM_TEMPERATURE` | температура сэмплинга, 0–2 (ниже = стабильнее) | `0.3` |
 | `SYSTEM_PROMPT_FILE` | путь к файлу системного промпта (пусто = встроенный) | — |
 | `MAX_INPUT_TOKENS` | лимит входных токенов (свыше — обрезка + предупреждение) | `200000` |

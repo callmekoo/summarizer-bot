@@ -13,8 +13,10 @@ const schema = z.object({
   // Любой OpenAI-совместимый провайдер. По умолчанию — OpenRouter.
   LLM_API_KEY: z.string().min(1, 'LLM_API_KEY (или OPENROUTER_API_KEY) обязателен'),
   LLM_BASE_URL: z.string().url().default('https://openrouter.ai/api/v1'),
-  MODEL: z.string().default('nvidia/nemotron-3-super-120b-a12b:free'),
-  MODEL_FALLBACK: z.string().default('nvidia/nemotron-3-nano-30b-a3b:free'),
+  // Слаги моделей у провайдера. MODEL обязателен; MODEL_FALLBACK опционален
+  // (пробуется при ошибке/429 основной). Дефолтов нет — выбираются под провайдера.
+  MODEL: z.string().min(1, 'MODEL обязателен (укажи slug модели)'),
+  MODEL_FALLBACK: z.string().optional(),
   // Температура сэмплинга: ниже = точнее/стабильнее, выше = разнообразнее. Для
   // суммаризации держим низкой. Диапазон 0–2.
   LLM_TEMPERATURE: z.coerce.number().min(0).max(2).default(0.3),

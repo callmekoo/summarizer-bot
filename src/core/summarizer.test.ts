@@ -10,6 +10,7 @@ before(async () => {
   process.env.DOTENV_CONFIG_PATH = '/dev/null'; // не зависеть от реального .env
   process.env.BOT_TOKEN = 'test-token';
   process.env.LLM_API_KEY = 'test-key';
+  process.env.MODEL = 'test/model';
   ({ capTokens } = await import('./summarizer.js'));
 });
 

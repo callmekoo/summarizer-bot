@@ -39,7 +39,7 @@ const MAX_RETRY_WAIT_MS = 30_000;
  */
 export async function summarize(text: string, title?: string): Promise<SummarizeResult> {
   const cap = capTokens(text, config.MAX_INPUT_TOKENS);
-  const models = [config.MODEL, config.MODEL_FALLBACK];
+  const models = [config.MODEL, config.MODEL_FALLBACK].filter((m): m is string => Boolean(m));
   const messages = [
     { role: 'system' as const, content: SYSTEM_PROMPT },
     { role: 'user' as const, content: userPrompt(title, cap.text) },
