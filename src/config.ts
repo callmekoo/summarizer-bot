@@ -10,7 +10,9 @@ const allowedUserIds = z
 
 const schema = z.object({
   BOT_TOKEN: z.string().min(1, 'BOT_TOKEN обязателен'),
-  OPENROUTER_API_KEY: z.string().min(1, 'OPENROUTER_API_KEY обязателен'),
+  // Любой OpenAI-совместимый провайдер. По умолчанию — OpenRouter.
+  LLM_API_KEY: z.string().min(1, 'LLM_API_KEY (или OPENROUTER_API_KEY) обязателен'),
+  LLM_BASE_URL: z.string().url().default('https://openrouter.ai/api/v1'),
   MODEL: z.string().default('nvidia/nemotron-3-super-120b-a12b:free'),
   MODEL_FALLBACK: z.string().default('nvidia/nemotron-3-nano-30b-a3b:free'),
   MAX_INPUT_TOKENS: z.coerce.number().int().positive().default(200_000),
@@ -21,7 +23,13 @@ const schema = z.object({
   LOG_LEVEL: z.string().default('info'),
 });
 
-const parsed = schema.safeParse(process.env);
+// Обратная совместимость: старое имя OPENROUTER_API_KEY → LLM_API_KEY.
+const env = {
+  ...process.env,
+  LLM_API_KEY: process.env.LLM_API_KEY ?? process.env.OPENROUTER_API_KEY,
+};
+
+const parsed = schema.safeParse(env);
 
 if (!parsed.success) {
   // Печатаем понятный список проблем и выходим — иначе упадём позже и непонятно.

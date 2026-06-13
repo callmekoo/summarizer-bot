@@ -25,7 +25,7 @@
 | Язык | **TypeScript (Node.js 20+)** | rdrr — нативная TS-библиотека; один язык на весь проект; общие типы |
 | Telegram | **grammY** | современный, отличная типизация, проще Telegraf, есть плагины (rate-limit, sessions) |
 | Извлечение текста | **rdrr** (как библиотека) | `parse(url)` → markdown + метаданные; сам определяет YouTube/статью |
-| LLM | **OpenRouter** через `openai` SDK | OpenRouter OpenAI-совместим: берём официальный SDK и меняем `baseURL` |
+| LLM | **OpenAI-совместимый API** через `openai` SDK | провайдер задаётся `LLM_BASE_URL`+`LLM_API_KEY` (дефолт OpenRouter); меняем только `baseURL` |
 | Подсчёт токенов | **gpt-tokenizer** | для чанкинга длинных текстов |
 | Конфиг | **zod** | валидация env-переменных на старте |
 | Логи | **pino** | структурные логи |

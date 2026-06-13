@@ -2,13 +2,14 @@ import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
 import type { capTokens as CapTokens } from './summarizer.js';
 
-// summarizer → openrouter → config валидирует env при импорте, поэтому задаём
+// summarizer → llm-client → config валидирует env при импорте, поэтому задаём
 // окружение заранее и подгружаем модуль динамически.
 let capTokens: typeof CapTokens;
 
 before(async () => {
+  process.env.DOTENV_CONFIG_PATH = '/dev/null'; // не зависеть от реального .env
   process.env.BOT_TOKEN = 'test-token';
-  process.env.OPENROUTER_API_KEY = 'test-key';
+  process.env.LLM_API_KEY = 'test-key';
   ({ capTokens } = await import('./summarizer.js'));
 });
 

@@ -4,11 +4,12 @@
 пересказ на русском (TL;DR + тезисы блоками).
 
 Извлечение текста — [rdrr](https://github.com/fkonovalov/rdrr), пересказ — LLM через
-[OpenRouter](https://openrouter.ai). Подробный план — в [PLAN.md](PLAN.md).
+**любой OpenAI-совместимый API** (по умолчанию [OpenRouter](https://openrouter.ai);
+меняется через `LLM_BASE_URL` + `LLM_API_KEY`). Подробный план — в [PLAN.md](PLAN.md).
 
 ## Стек
 
-TypeScript (Node 20+) · grammY · rdrr · OpenRouter (через `openai` SDK).
+TypeScript (Node 20+) · grammY · rdrr · OpenAI-совместимый LLM API (через `openai` SDK).
 
 ## Запуск
 
@@ -90,7 +91,8 @@ docker compose up -d --build      # пересобрать и перезапус
 | Переменная | Назначение | По умолчанию |
 |---|---|---|
 | `BOT_TOKEN` | токен Telegram-бота (от @BotFather) | — (обязательна) |
-| `OPENROUTER_API_KEY` | ключ OpenRouter | — (обязательна) |
+| `LLM_API_KEY` | ключ LLM-провайдера (или старый `OPENROUTER_API_KEY`) | — (обязательна) |
+| `LLM_BASE_URL` | baseURL OpenAI-совместимого API | `https://openrouter.ai/api/v1` |
 | `MODEL` | основная модель | `nvidia/nemotron-3-super-120b-a12b:free` |
 | `MODEL_FALLBACK` | запасная модель | `nvidia/nemotron-3-nano-30b-a3b:free` |
 | `MAX_INPUT_TOKENS` | лимит входных токенов (свыше — обрезка + предупреждение) | `200000` |

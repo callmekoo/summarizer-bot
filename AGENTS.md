@@ -26,7 +26,8 @@ npm run dev
 
 - **TypeScript / Node.js 20+**, ESM (`"type": "module"`, `module: NodeNext`).
 - **grammY** — телеграм-бот. **rdrr** — извлечение текста (как библиотека).
-- **OpenRouter** через `openai` SDK (OpenAI-совместимый, другой `baseURL`).
+- **LLM** — любой OpenAI-совместимый API через `openai` SDK; провайдер задаётся
+  `LLM_BASE_URL` + `LLM_API_KEY` (дефолт — OpenRouter).
 - **zod** — валидация env, **pino** — логи, **gpt-tokenizer** — подсчёт токенов.
 
 > ⚠️ Node ставится через **nvm** (`v22.22.3`); в системном PATH его может не быть.
@@ -64,7 +65,7 @@ src/
     summarizer.ts   один проход OpenRouter + обрезка + фолбэк → SummarizeResult
                     ({text, model, usage, truncated, keptPercent}); ошибки SummarizeError
     formatter.ts    escape HTML → **bold**→<b> → разбивка ≤4096; шапка источника
-  llm/              openrouter (клиент), prompts (русский, TL;DR + блоки)
+  llm/              client (OpenAI-совместимый клиент), prompts (русский, TL;DR + блоки)
   lib/              url, logger, concurrency (лимитер очереди), rateLimiter (окно)
   types.ts
 ```
@@ -79,6 +80,8 @@ src/
   превращает `**…**` в `<b>…</b>`. Не добавляй сырой HTML до экранирования.
 - **Язык ответа — всегда русский**, формат: `🔑 TL;DR` + смысловые блоки со списками.
 - Ошибки наружу — понятным текстом пользователю, не стек-трейсом (см. `onLink`).
+- Провайдер настраивается (`LLM_BASE_URL`/`LLM_API_KEY`), всё ниже — **специфика
+  дефолтного OpenRouter**; для OpenAI/Groq/Ollama просто поменяй baseURL+ключ+`MODEL`.
 - Модели бесплатные (`:free`), id — в env (`MODEL`, `MODEL_FALLBACK`); список меняется,
   проверять можно через `GET /api/v1/models`.
 - **Venice-подвох:** free-слаги Meta/Qwen/Google/DeepSeek роутятся через провайдера

@@ -1,5 +1,5 @@
 import { encode } from 'gpt-tokenizer';
-import { openrouter } from '../llm/openrouter.js';
+import { llm } from '../llm/client.js';
 import { SYSTEM_PROMPT, userPrompt } from '../llm/prompts.js';
 import { config } from '../config.js';
 import { logger } from '../lib/logger.js';
@@ -55,7 +55,7 @@ export async function summarize(text: string, title?: string): Promise<Summarize
 
     for (const model of models) {
       try {
-        const resp = await openrouter.chat.completions.create({ model, temperature: 0.3, messages });
+        const resp = await llm.chat.completions.create({ model, temperature: 0.3, messages });
         const content = resp.choices[0]?.message?.content?.trim();
         if (content) {
           return {
@@ -110,7 +110,7 @@ function httpStatus(err: unknown): number | undefined {
   return typeof err === 'object' && err !== null ? (err as { status?: number }).status : undefined;
 }
 
-/** Приводит usage из ответа OpenRouter к нашему виду (поля могут отсутствовать). */
+/** Приводит usage из ответа провайдера к нашему виду (поля могут отсутствовать). */
 function mapUsage(usage: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } | undefined): TokenUsage | undefined {
   if (!usage) return undefined;
   return {
