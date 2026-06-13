@@ -22,6 +22,21 @@ test('toTelegramHtml обрезает ведущие/замыкающие про
   assert.equal(toTelegramHtml('  привет  '), 'привет');
 });
 
+test('toTelegramHtml: инлайн-код `…` → <code>, без сырых бэктиков', () => {
+  const out = toTelegramHtml('зови `parseUrl()` для разбора');
+  assert.equal(out, 'зови <code>parseUrl()</code> для разбора');
+  assert.ok(!out.includes('`'), 'сырых бэктиков не осталось');
+});
+
+test('toTelegramHtml: блок ```…``` → <pre>, тег языка отброшен', () => {
+  const out = toTelegramHtml('пример:\n```js\nconst x = 1;\n```');
+  assert.equal(out, 'пример:\n<pre>const x = 1;</pre>');
+});
+
+test('toTelegramHtml: содержимое кода тоже экранируется', () => {
+  assert.equal(toTelegramHtml('`a < b && c`'), '<code>a &lt; b &amp;&amp; c</code>');
+});
+
 test('splitForTelegram не трогает короткий текст', () => {
   assert.deepEqual(splitForTelegram('коротко', 4096), ['коротко']);
 });

@@ -38,12 +38,20 @@ export function renderSourceHeader(meta: SourceMeta): string {
 
 /**
  * Превращает ответ модели в безопасный Telegram-HTML.
- * Модель размечает заголовки блоков как **жирный** — сначала всё экранируем,
- * затем по нашей же конвенции превращаем **…** в <b>…</b>.
+ * Сначала всё экранируем, затем по нашим конвенциям маппим markdown в HTML-теги,
+ * которые понимает Telegram. Бэктики обязательно превращаем в <code>/<pre> —
+ * иначе они утекают сырыми символами (parse_mode HTML их за разметку не считает).
  */
 export function toTelegramHtml(text: string): string {
-  const escaped = escapeHtml(text.trim());
-  return escaped.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+  let s = escapeHtml(text.trim());
+  // Блоки кода ```…``` → <pre> (до инлайна, чтобы тройные бэктики не съел `…`).
+  // Необязательный тег языка после ``` отбрасываем.
+  s = s.replace(/```[^\n`]*\n?([\s\S]*?)```/g, (_m, code: string) => `<pre>${code.replace(/\n+$/, '')}</pre>`);
+  // Инлайн-код `…` → <code>.
+  s = s.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+  // **жирный** → <b> (заголовки блоков).
+  s = s.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+  return s;
 }
 
 /** Режет текст на части под лимит Telegram (4096), по границам строк. */
