@@ -15,6 +15,8 @@ const schema = z.object({
   LLM_BASE_URL: z.string().url().default('https://openrouter.ai/api/v1'),
   MODEL: z.string().default('nvidia/nemotron-3-super-120b-a12b:free'),
   MODEL_FALLBACK: z.string().default('nvidia/nemotron-3-nano-30b-a3b:free'),
+  // Путь к файлу с системным промптом. Пусто = встроенный дефолт.
+  SYSTEM_PROMPT_FILE: z.string().optional(),
   MAX_INPUT_TOKENS: z.coerce.number().int().positive().default(200_000),
   RATE_LIMIT_PER_MIN: z.coerce.number().int().positive().default(5),
   MAX_CONCURRENCY: z.coerce.number().int().positive().default(2),

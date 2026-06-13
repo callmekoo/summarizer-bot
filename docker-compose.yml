@@ -14,6 +14,11 @@ services:
     # Метка для autoheal (см. опциональный сервис ниже).
     labels:
       autoheal: "true"
+    # Кастомный системный промпт без пересборки образа: создай prompt.txt рядом с
+    # этим файлом, поставь SYSTEM_PROMPT_FILE=/app/prompt.txt в .env и раскомментируй.
+    # Правишь prompt.txt → docker compose restart bot.
+    # volumes:
+    #   - ./prompt.txt:/app/prompt.txt:ro
 
   # --- Опционально: автоперезапуск по healthcheck ---------------------------
   # restart: unless-stopped перезапускает контейнер, только когда процесс ВЫШЕЛ.

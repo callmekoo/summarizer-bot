@@ -95,6 +95,7 @@ docker compose up -d --build      # пересобрать и перезапус
 | `LLM_BASE_URL` | baseURL OpenAI-совместимого API | `https://openrouter.ai/api/v1` |
 | `MODEL` | основная модель | `nvidia/nemotron-3-super-120b-a12b:free` |
 | `MODEL_FALLBACK` | запасная модель | `nvidia/nemotron-3-nano-30b-a3b:free` |
+| `SYSTEM_PROMPT_FILE` | путь к файлу системного промпта (пусто = встроенный) | — |
 | `MAX_INPUT_TOKENS` | лимит входных токенов (свыше — обрезка + предупреждение) | `200000` |
 | `RATE_LIMIT_PER_MIN` | лимит запросов/мин на пользователя | `5` |
 | `MAX_CONCURRENCY` | одновременных обработок (parse + LLM) | `2` |
@@ -111,6 +112,19 @@ docker compose up -d --build      # пересобрать и перезапус
 curl -s https://openrouter.ai/api/v1/models | \
   jq -r '.data[] | select(.id | endswith(":free")) | .id'
 ```
+
+## Системный промпт без пересборки
+
+По умолчанию промпт встроен в код. Чтобы менять его, не пересобирая образ, вынеси в файл
+и укажи `SYSTEM_PROMPT_FILE`. Промпт читается при старте — после правки **перезапусти**
+(не пересобирай):
+
+- **Локально:** `SYSTEM_PROMPT_FILE=./prompt.txt` в `.env`, правишь файл → перезапуск.
+- **Docker:** примонтируй файл и укажи путь внутри контейнера — раскомментируй `volumes`
+  в [docker-compose.yml](docker-compose.yml), поставь `SYSTEM_PROMPT_FILE=/app/prompt.txt`,
+  затем `docker compose restart bot`.
+
+Если файл не задан, пуст или нечитаем — используется встроенный дефолт (с логом).
 
 ## Структура
 

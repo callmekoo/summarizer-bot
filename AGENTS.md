@@ -65,7 +65,8 @@ src/
     summarizer.ts   один проход OpenRouter + обрезка + фолбэк → SummarizeResult
                     ({text, model, usage, truncated, keptPercent}); ошибки SummarizeError
     formatter.ts    escape HTML → **bold**→<b> → разбивка ≤4096; шапка источника
-  llm/              client (OpenAI-совместимый клиент), prompts (русский, TL;DR + блоки)
+  llm/              client (OpenAI-совместимый клиент), prompts (дефолт + загрузка из
+                    SYSTEM_PROMPT_FILE при старте)
   lib/              url, logger, concurrency (лимитер очереди), rateLimiter (окно)
   types.ts
 ```
