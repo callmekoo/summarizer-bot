@@ -95,6 +95,7 @@ docker compose up -d --build      # пересобрать и перезапус
 | `LLM_BASE_URL` | baseURL OpenAI-совместимого API | `https://openrouter.ai/api/v1` |
 | `MODEL` | основная модель | `nvidia/nemotron-3-super-120b-a12b:free` |
 | `MODEL_FALLBACK` | запасная модель | `nvidia/nemotron-3-nano-30b-a3b:free` |
+| `LLM_TEMPERATURE` | температура сэмплинга, 0–2 (ниже = стабильнее) | `0.3` |
 | `SYSTEM_PROMPT_FILE` | путь к файлу системного промпта (пусто = встроенный) | — |
 | `MAX_INPUT_TOKENS` | лимит входных токенов (свыше — обрезка + предупреждение) | `200000` |
 | `RATE_LIMIT_PER_MIN` | лимит запросов/мин на пользователя | `5` |

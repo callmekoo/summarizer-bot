@@ -15,6 +15,9 @@ const schema = z.object({
   LLM_BASE_URL: z.string().url().default('https://openrouter.ai/api/v1'),
   MODEL: z.string().default('nvidia/nemotron-3-super-120b-a12b:free'),
   MODEL_FALLBACK: z.string().default('nvidia/nemotron-3-nano-30b-a3b:free'),
+  // Температура сэмплинга: ниже = точнее/стабильнее, выше = разнообразнее. Для
+  // суммаризации держим низкой. Диапазон 0–2.
+  LLM_TEMPERATURE: z.coerce.number().min(0).max(2).default(0.3),
   // Путь к файлу с системным промптом. Пусто = встроенный дефолт.
   SYSTEM_PROMPT_FILE: z.string().optional(),
   MAX_INPUT_TOKENS: z.coerce.number().int().positive().default(200_000),

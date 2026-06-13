@@ -55,7 +55,7 @@ export async function summarize(text: string, title?: string): Promise<Summarize
 
     for (const model of models) {
       try {
-        const resp = await llm.chat.completions.create({ model, temperature: 0.3, messages });
+        const resp = await llm.chat.completions.create({ model, temperature: config.LLM_TEMPERATURE, messages });
         const content = resp.choices[0]?.message?.content?.trim();
         if (content) {
           return {
