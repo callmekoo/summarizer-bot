@@ -26,7 +26,7 @@
 | Telegram | **grammY** | современный, отличная типизация, проще Telegraf, есть плагины (rate-limit, sessions) |
 | Извлечение текста | **rdrr** (как библиотека) | `parse(url)` → markdown + метаданные; сам определяет YouTube/статью |
 | LLM | **OpenAI-совместимый API** через `openai` SDK | провайдер задаётся `LLM_BASE_URL`+`LLM_API_KEY` (дефолт OpenRouter); меняем только `baseURL` |
-| Подсчёт токенов | **gpt-tokenizer** | для чанкинга длинных текстов |
+| Оценка токенов | **эвристика символы÷3** | без зависимости; обрезка — редкий предохранитель |
 | Конфиг | **zod** | валидация env-переменных на старте |
 | Логи | **pino** | структурные логи |
 | Хранилище | поначалу нет, далее **SQLite** | для MVP не нужно; позже — кэш по URL и история |
@@ -129,7 +129,7 @@ src/
 Отмечаем сделанное `[x]`. Каждый этап заканчивается рабочим, проверяемым состоянием.
 
 ### Этап 0 — каркас ✅
-- [x] `npm init`, TypeScript, `tsx`, `pino`, `zod`, `grammY`, `openai`, `rdrr`, `gpt-tokenizer`
+- [x] `npm init`, TypeScript, `tsx`, `pino`, `zod`, `grammY`, `openai`, `rdrr`
 - [x] `tsconfig.json`, скрипты `dev`/`build`/`start`/`typecheck`
 - [x] `config.ts` с zod-валидацией env; `.env.example`
 - [x] Бот с хендлерами `/start` и `/help`

@@ -1,4 +1,3 @@
-import { encode } from 'gpt-tokenizer';
 import { llm } from '../llm/client.js';
 import { SYSTEM_PROMPT, userPrompt } from '../llm/prompts.js';
 import { config } from '../config.js';
@@ -139,14 +138,24 @@ export interface CapResult {
   keptPercent: number;
 }
 
+// Грубая оценка токенов по символам — без зависимости-токенайзера. Берём ~3 символа
+// на токен: для русского/смешанного это близко, для английского — с запасом (оценка
+// завышает число токенов → обрезаем чуть раньше, а не переполняем контекст). Точность
+// тут не важна: это редкий предохранитель, а лимит (200k) сильно ниже контекста моделей.
+const APPROX_CHARS_PER_TOKEN = 3;
+
+function estimateTokens(text: string): number {
+  return Math.ceil(text.length / APPROX_CHARS_PER_TOKEN);
+}
+
 /** Обрезает текст под бюджет токенов (грубо, пропорционально по символам). */
 export function capTokens(text: string, maxTokens: number): CapResult {
-  const tokenCount = encode(text).length;
+  const tokenCount = estimateTokens(text);
   if (tokenCount <= maxTokens) {
     return { text, truncated: false, keptPercent: 100 };
   }
   const ratio = maxTokens / tokenCount;
-  logger.warn({ tokenCount, maxTokens }, 'текст превышает лимит токенов, обрезаю');
+  logger.warn({ tokenCount, maxTokens }, 'текст превышает лимит токенов (оценка), обрезаю');
   return {
     text: text.slice(0, Math.floor(text.length * ratio)),
     truncated: true,
