@@ -114,17 +114,24 @@ curl -s https://openrouter.ai/api/v1/models | \
 
 ```
 src/
-  bot.ts            точка входа
+  bot.ts            точка входа (grammY, middleware, heartbeat, graceful shutdown)
   config.ts         env + валидация (zod)
+  types.ts          ExtractResult
   handlers/         хендлеры Telegram (onStart, onLink)
   middleware/       allowlist (Telegram ID), rateLimit (запросов/мин)
   core/             extractor, summarizer, formatter
   llm/              клиент OpenRouter + промпты
   lib/              url, logger, concurrency, rateLimiter
   **/*.test.ts      юнит-тесты рядом с кодом (node:test)
+
+Dockerfile · docker-compose.yml · .dockerignore   — деплой (см. выше)
+tsconfig.json / tsconfig.build.json                — типы / сборка (без тестов)
 ```
 
 ## Статус
 
-Готов happy path (Этап 1): ссылка → текст → пересказ → ответ. Дальше по
-[PLAN.md](PLAN.md): устойчивость (ретраи, rate-limit, категории ошибок) и продакшн.
+Рабочий бот, развёрнутый сценарий «ссылка → пересказ» полностью готов. Сделаны Этапы 1–3
+и бо́льшая часть Этапа 4 (Docker, compose, healthcheck, метрики). Что осталось — открытые
+пункты в [PLAN.md](PLAN.md): **webhook** (и тогда `/health` вместо heartbeat) и
+опциональный **SQLite-кэш по URL**. Полный map-reduce для сверхдлинных текстов — тоже
+опционально (сейчас работает обрезка с предупреждением, см. PLAN, Этап 2).

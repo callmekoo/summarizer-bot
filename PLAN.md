@@ -67,26 +67,37 @@
 
 ### Структура каталогов
 
+Фактическая структура (`*.test.ts` лежат рядом с модулями, node:test):
+
 ```
 src/
-  bot.ts            # точка входа: grammY, регистрация хендлеров, graceful shutdown
-  config.ts         # чтение env (zod): BOT_TOKEN, OPENROUTER_API_KEY, MODEL…
+  bot.ts            # точка входа: grammY, middleware, heartbeat, graceful shutdown
+  config.ts         # чтение env (zod): токены, модели, лимиты, allowlist…
+  types.ts          # ExtractResult
   handlers/
-    onLink.ts       # основной хендлер: парсит URL, оркестрирует пайплайн
+    onLink.ts       # основной хендлер: URL → пайплайн → ответ + метрики
     onStart.ts      # /start, /help
+  middleware/
+    allowlist.ts    # фильтр по ALLOWED_USER_IDS (+ чистая isAllowed)
+    rateLimit.ts    # лимит запросов/мин на пользователя
   core/
-    extractor.ts    # обёртка над rdrr: ретраи, таймаут, нормализация ошибок
-    summarizer.ts   # вызовы OpenRouter, промпты, map-reduce для длинных текстов
-    chunker.ts      # разбивка текста по токенам
-    formatter.ts    # подготовка ответа под лимиты Telegram
+    extractor.ts    # обёртка над rdrr: таймаут, 3 ретрая, нормализация ошибок
+    summarizer.ts   # вызовы OpenRouter, промпты, обрезка по токенам, fallback
+    formatter.ts    # Telegram-HTML, шапка источника, разбивка ≤4096
   llm/
     openrouter.ts   # клиент (openai SDK с baseURL OpenRouter)
     prompts.ts      # системный и пользовательский промпты
   lib/
     url.ts          # извлечение и валидация ссылок
     logger.ts       # pino
-  types.ts
+    concurrency.ts  # лимитер очереди (MAX_CONCURRENCY)
+    rateLimiter.ts  # скользящее окно
 ```
+
+> `chunker.ts` (для map-reduce) пока не создан — см. Этап 2, выбран быстрый вариант.
+
+Корень: `Dockerfile`, `docker-compose.yml`, `.dockerignore`, `tsconfig.json` /
+`tsconfig.build.json` (сборка без тестов).
 
 ---
 

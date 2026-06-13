@@ -55,13 +55,14 @@ config). Сетевые вызовы (rdrr, OpenRouter) в юнит-тестах
 
 ```
 src/
-  bot.ts            точка входа (grammY, graceful shutdown)
+  bot.ts            точка входа: grammY, middleware, heartbeat, graceful shutdown
   config.ts         env + zod; падает с понятной ошибкой при невалидном .env
-  handlers/         onStart (/start, /help), onLink (оркестрация пайплайна)
+  handlers/         onStart (/start, /help), onLink (оркестрация пайплайна + метрики)
   middleware/       allowlist (ALLOWED_USER_IDS), rateLimit (RATE_LIMIT_PER_MIN)
   core/
     extractor.ts    rdrr.parse(url) с таймаутом + 3 ретрая; ошибки → ExtractError(kind)
-    summarizer.ts   один проход OpenRouter + обрезка + фолбэк; → {text, model, usage}
+    summarizer.ts   один проход OpenRouter + обрезка + фолбэк → SummarizeResult
+                    ({text, model, usage, truncated, keptPercent}); ошибки SummarizeError
     formatter.ts    escape HTML → **bold**→<b> → разбивка ≤4096; шапка источника
   llm/              openrouter (клиент), prompts (русский, TL;DR + блоки)
   lib/              url, logger, concurrency (лимитер очереди), rateLimiter (окно)
@@ -87,9 +88,16 @@ src/
 
 ## Статус и следующие шаги
 
-Сделаны Этап 0 (каркас) и Этап 1 (happy path). Дальше по [PLAN.md](PLAN.md):
-Этап 3 — устойчивость (ретраи, rate-limit, очередь). Этап 2 (map-reduce) отложен:
-контекста основной модели (1M) хватает на типичные тексты, пока обходимся обрезкой по `MAX_INPUT_TOKENS`.
+Готовы Этапы 0–3 и бо́льшая часть Этапа 4: happy path, устойчивость (ретраи rdrr,
+fallback-модель + повтор по 429, очередь `MAX_CONCURRENCY`, rate-limit, allowlist),
+шапка источника, метрики (строка `request`), Docker + compose + heartbeat-healthcheck.
+Развёрнут на GitHub: `callmekoo/summarizer-bot`.
+
+Открыто (см. [PLAN.md](PLAN.md)):
+- **webhook** вместо polling — и тогда healthcheck переделать на HTTP `/health`;
+- опциональный **SQLite-кэш по URL**;
+- полный **map-reduce** для сверхдлинных текстов (Этап 2) — сейчас работает обрезка с
+  предупреждением, контекста моделей (1M/256k) хватает на типичные входы.
 
 ## При обновлении этого файла
 
