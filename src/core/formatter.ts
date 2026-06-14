@@ -47,11 +47,40 @@ export function toTelegramHtml(text: string): string {
   // Блоки кода ```…``` → <pre> (до инлайна, чтобы тройные бэктики не съел `…`).
   // Необязательный тег языка после ``` отбрасываем.
   s = s.replace(/```[^\n`]*\n?([\s\S]*?)```/g, (_m, code: string) => `<pre>${code.replace(/\n+$/, '')}</pre>`);
+  // Цитаты: подряд идущие строки `> …` → один <blockquote>.
+  s = wrapBlockquotes(s);
   // Инлайн-код `…` → <code>.
   s = s.replace(/`([^`\n]+)`/g, '<code>$1</code>');
   // **жирный** → <b> (заголовки блоков).
   s = s.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
   return s;
+}
+
+// После escapeHtml символ '>' уже стал '&gt;', поэтому ловим строки цитат по нему.
+const QUOTE_LINE = /^&gt;\s?/;
+
+/** Группирует подряд идущие строки-цитаты в один <blockquote> (markdown `>` → Telegram). */
+function wrapBlockquotes(s: string): string {
+  const out: string[] = [];
+  let quote: string[] | null = null;
+
+  const flush = (): void => {
+    if (quote) {
+      out.push(`<blockquote>${quote.join('\n')}</blockquote>`);
+      quote = null;
+    }
+  };
+
+  for (const line of s.split('\n')) {
+    if (QUOTE_LINE.test(line)) {
+      (quote ??= []).push(line.replace(QUOTE_LINE, ''));
+    } else {
+      flush();
+      out.push(line);
+    }
+  }
+  flush();
+  return out.join('\n');
 }
 
 /** Режет текст на части под лимит Telegram (4096), по границам строк. */
