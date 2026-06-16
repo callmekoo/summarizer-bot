@@ -171,6 +171,8 @@ src/
 
 ### Этап 4 — продакшн
 - [x] `Dockerfile` (multi-stage, non-root, only prod-deps) + `.dockerignore`
+- [x] CI собирает образ и пушит в GHCR (`.github/workflows/docker.yml`); сервер только
+  `docker compose pull` — сборку с слабого VPS убрали (там `tsc` тянулся минутами)
 - [x] Метрики: одна строка-лог `request` на запрос (`ok`, `model`, `parseMs`, `llmMs`,
   `totalMs`, `promptTokens`/`completionTokens`, `queuedAhead`, `reason` при ошибке)
 - [x] Healthcheck (heartbeat-файл): бот обновляет `HEARTBEAT_FILE`, пока опрашивает

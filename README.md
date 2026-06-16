@@ -33,14 +33,18 @@ npm start
 Multi-stage сборка (build → runtime, в образе только прод-зависимости), запуск под
 непривилегированным пользователем. Бот работает по long-polling — входящий порт не нужен.
 
+Образ собирает CI и публикует в GHCR — `ghcr.io/callmekoo/summarizer-bot`
+(см. [`.github/workflows/docker.yml`](.github/workflows/docker.yml)). На сервере его не
+собирают, а **скачивают готовым** (`tsc` + `npm ci` на слабом VPS — это минуты):
+
 ```sh
-docker build -t summarizer-bot .
-docker run --rm --env-file .env summarizer-bot
+docker run --rm --env-file .env ghcr.io/callmekoo/summarizer-bot:latest
 ```
 
-Секреты передаются через `--env-file` (`.env` в образ не копируется, см. `.dockerignore`).
+Локально из исходников (для разработки): `docker build -t summarizer-bot .`.
 
-Секреты — через `--env-file`. Для постоянной работы удобнее Docker Compose (ниже).
+Секреты передаются через `--env-file` (`.env` в образ не копируется, см. `.dockerignore`).
+Для постоянной работы удобнее Docker Compose (ниже).
 
 **Healthcheck.** Бот пишет heartbeat-файл (`HEARTBEAT_FILE`), пока опрашивает Telegram;
 `HEALTHCHECK` в образе считает контейнер `unhealthy`, если файл «протух» (> 60 с). Docker
@@ -58,13 +62,17 @@ curl -fsSL https://get.docker.com | sh
 sudo usermod -aG docker "$USER"   # чтобы запускать без sudo; затем перелогиниться
 ```
 
-Деплой:
+Деплой (образ тянется из GHCR, на сервере ничего не собирается):
 
 ```sh
 git clone <repo-url> summarizer && cd summarizer
-cp .env.example .env              # вписать BOT_TOKEN, OPENROUTER_API_KEY, ALLOWED_USER_IDS
-docker compose up -d --build      # собрать образ и поднять в фоне
+cp .env.example .env              # вписать BOT_TOKEN, LLM_API_KEY, MODEL, ALLOWED_USER_IDS
+docker compose pull               # скачать готовый образ из GHCR
+docker compose up -d              # поднять в фоне
 ```
+
+Образ публичный — для `pull` логин в GHCR не нужен. На сервере достаточно `compose.yml`
+и `.env` (репозиторий клонировать необязательно).
 
 Управление:
 
@@ -75,11 +83,11 @@ docker compose restart bot        # перезапуск
 docker compose down               # остановить и удалить контейнер
 ```
 
-Обновление после изменений в коде:
+Обновление после изменений в коде (CI уже собрал и запушил новый образ в GHCR):
 
 ```sh
-git pull
-docker compose up -d --build      # пересобрать и перезапустить
+docker compose pull               # подтянуть свежий :latest
+docker compose up -d              # перезапустить на новом образе
 ```
 
 `restart: unless-stopped` поднимет бота после краша и перезагрузки сервера. Чтобы ещё и

@@ -96,7 +96,9 @@ src/
 Готовы Этапы 0–3 и бо́льшая часть Этапа 4: happy path, устойчивость (ретраи rdrr,
 fallback-модель + повтор по 429, очередь `MAX_CONCURRENCY`, rate-limit, allowlist),
 шапка источника, метрики (строка `request`), Docker + compose + heartbeat-healthcheck.
-Развёрнут на GitHub: `callmekoo/summarizer-bot`.
+Развёрнут на GitHub: `callmekoo/summarizer-bot`. Образ собирает CI
+(`.github/workflows/docker.yml`) и пушит в GHCR (`ghcr.io/callmekoo/summarizer-bot`);
+на сервере — `docker compose pull` (сборку с слабого VPS убрали, там `tsc` шёл минутами).
 
 Открыто (см. [PLAN.md](PLAN.md)):
 - **webhook** вместо polling — и тогда healthcheck переделать на HTTP `/health`;

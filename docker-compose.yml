@@ -1,7 +1,10 @@
 services:
   bot:
-    build: .
-    image: summarizer-bot
+    # Готовый образ из GHCR (его собирает CI, см. .github/workflows/docker.yml).
+    # На сервере: `docker compose pull && docker compose up -d` — без сборки.
+    image: ghcr.io/callmekoo/summarizer-bot:latest
+    # Для локальной сборки из исходников раскомментируй (тогда `up --build`):
+    # build: .
     container_name: summarizer-bot
     env_file: .env
     restart: unless-stopped
