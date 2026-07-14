@@ -4,6 +4,7 @@ import { config } from './config.js';
 import { logger } from './lib/logger.js';
 import { onStart } from './handlers/onStart.js';
 import { onLink } from './handlers/onLink.js';
+import { onArticle } from './handlers/onArticle.js';
 import { allowlist } from './middleware/allowlist.js';
 import { rateLimit } from './middleware/rateLimit.js';
 
@@ -19,6 +20,8 @@ bot.use(allowlist);
 bot.use(rateLimit);
 bot.command('start', onStart);
 bot.command('help', onStart);
+// Команды разбираются до общего обработчика текста, иначе `/article <url>` уйдёт в пересказ.
+bot.command('article', onArticle);
 bot.on('message:text', onLink);
 
 bot.catch((err) => {

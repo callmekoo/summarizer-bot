@@ -1,5 +1,5 @@
 import { logger } from '../lib/logger.js';
-import type { ExtractResult } from '../types.js';
+import type { Chapter, ExtractResult, TranscriptSegment } from '../types.js';
 
 export type ExtractErrorKind = 'empty' | 'timeout' | 'failed';
 
@@ -64,6 +64,8 @@ export async function extract(url: string): Promise<ExtractResult> {
         wordCount: result?.wordCount ?? meta.wordCount,
         type: result?.type ?? meta.type,
         url,
+        chapters: normalizeChapters(result?.chapters),
+        transcript: normalizeTranscript(result?.transcript),
       };
     } catch (err) {
       if (err instanceof ExtractError && err.kind === 'empty') throw err;
@@ -79,6 +81,34 @@ export async function extract(url: string): Promise<ExtractResult> {
   if (lastErr instanceof ExtractError) throw lastErr; // таймаут
   logger.error({ err: lastErr, url }, 'rdrr parse failed');
   throw new ExtractError('failed', 'не удалось извлечь текст по ссылке');
+}
+
+/**
+ * Главы и транскрипт есть только у YouTube (и то не всегда: главы автор размечает вручную).
+ * rdrr без публичных типов, поэтому проверяем форму, а не верим на слово: кривой сегмент
+ * лучше отбросить, чем уронить сборку статьи на undefined.
+ */
+function normalizeChapters(raw: unknown): Chapter[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const chapters = raw
+    .filter((c): c is Record<string, unknown> => typeof c === 'object' && c !== null)
+    .map((c) => ({ title: String(c.title ?? '').trim(), startTime: Number(c.startTime ?? 0) }))
+    .filter((c) => c.title && Number.isFinite(c.startTime));
+  return chapters.length ? chapters : undefined;
+}
+
+function normalizeTranscript(raw: unknown): TranscriptSegment[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const segments = raw
+    .filter((s): s is Record<string, unknown> => typeof s === 'object' && s !== null)
+    .map((s) => ({
+      text: String(s.text ?? '').trim(),
+      startTime: Number(s.startTime ?? 0),
+      // Нет главы — считаем, что всё видео это одна глава №0.
+      chapterIndex: Number.isFinite(Number(s.chapterIndex)) ? Number(s.chapterIndex) : 0,
+    }))
+    .filter((s) => s.text);
+  return segments.length ? segments : undefined;
 }
 
 function sleep(ms: number): Promise<void> {

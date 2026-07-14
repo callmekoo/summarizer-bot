@@ -22,6 +22,14 @@ const schema = z.object({
   LLM_TEMPERATURE: z.coerce.number().min(0).max(2).default(0.3),
   // Путь к файлу с системным промптом. Пусто = встроенный дефолт.
   SYSTEM_PROMPT_FILE: z.string().optional(),
+  // То же для команды /article (транскрипт видео → статья). Защита от инъекций
+  // подмешивается кодом в обоих случаях, в файле — только задача/стиль/формат.
+  ARTICLE_PROMPT_FILE: z.string().optional(),
+  // Язык статьи: original — как в видео, ru — переводить на русский.
+  ARTICLE_LANG: z.enum(['original', 'ru']).default('original'),
+  // Размер куска транскрипта в символах. Маленький кусок модель разворачивает честно,
+  // на большом скатывается в пересказ — поэтому бюджет невелик и не привязан к лимитам API.
+  ARTICLE_CHUNK_CHARS: z.coerce.number().int().positive().default(12_000),
   MAX_INPUT_TOKENS: z.coerce.number().int().positive().default(200_000),
   RATE_LIMIT_PER_MIN: z.coerce.number().int().positive().default(5),
   MAX_CONCURRENCY: z.coerce.number().int().positive().default(2),
