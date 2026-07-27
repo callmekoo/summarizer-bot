@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chunkTranscript } from './chunker.js';
+import { chunkTranscript, stripAdChapters, isAdChapter } from './chunker.js';
 import type { Chapter, TranscriptSegment } from '../types.js';
 
 /** Сегменты с уникальными текстами s0, s1… — так легко проверить порядок и полноту. */
@@ -90,4 +90,49 @@ test('пустой транскрипт → пустой список, без п
 
 test('нулевой бюджет — это ошибка конфигурации, а не тихое зацикливание', () => {
   assert.throws(() => chunkTranscript(segments([{ chapter: 0 }]), chapters, 0));
+});
+
+test('isAdChapter: ловит самостоятельные рекламные названия', () => {
+  for (const t of ['Реклама', 'реклама', '⚡ Реклама!', 'Спонсор', 'Спонсоры', 'Промо', 'Ad break', 'SPONSOR']) {
+    assert.ok(isAdChapter(t), `реклама: ${t}`);
+  }
+});
+
+test('isAdChapter: НЕ трогает содержательные главы, где реклама — тема', () => {
+  // Иначе выкинем кусок видео, который как раз про рекламу.
+  for (const t of ['Реклама в играх', 'Как работает реклама', 'Спонсорство в киберспорте', 'Реклама и этика']) {
+    assert.ok(!isAdChapter(t), `не реклама: ${t}`);
+  }
+});
+
+test('stripAdChapters: сегменты рекламной главы выброшены, остальные целы', () => {
+  // Ровно случай из жизни: автор разметил рекламу отдельной главой (БУЛДЖАТь, 4:34).
+  const withAd: Chapter[] = [
+    { title: 'Вступление', startTime: 0 },
+    { title: 'Реклама', startTime: 10 },
+    { title: 'Итоги', startTime: 20 },
+  ];
+  const t = segments([{ chapter: 0 }, { chapter: 1 }, { chapter: 1 }, { chapter: 2 }]);
+
+  const kept = stripAdChapters(t, withAd);
+  assert.equal(kept.length, 2, 'два рекламных сегмента выброшены');
+  assert.deepEqual(kept.map((s) => s.chapterIndex), [0, 2], 'осталось содержание');
+});
+
+test('stripAdChapters: заголовок «Реклама» не доедет до модели как заголовок раздела', () => {
+  const withAd: Chapter[] = [
+    { title: 'Вступление', startTime: 0 },
+    { title: 'Реклама', startTime: 10 },
+  ];
+  const t = segments([{ chapter: 0 }, { chapter: 1 }]);
+
+  const chunks = chunkTranscript(stripAdChapters(t, withAd), withAd, 10_000);
+  const titles = chunks.flatMap((c) => c.chapterTitles);
+  assert.deepEqual(titles, ['Вступление'], 'рекламной главы среди заголовков нет');
+});
+
+test('stripAdChapters: нет глав или нет рекламы → транскрипт не трогаем', () => {
+  const t = segments([{ chapter: 0 }, { chapter: 1 }]);
+  assert.equal(stripAdChapters(t, undefined), t);
+  assert.equal(stripAdChapters(t, chapters), t, 'обычные главы не тронуты');
 });

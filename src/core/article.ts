@@ -1,4 +1,4 @@
-import { chunkTranscript } from './chunker.js';
+import { chunkTranscript, stripAdChapters } from './chunker.js';
 import { ARTICLE_SYSTEM_PROMPT, articleUserPrompt } from '../llm/prompts.js';
 import { complete, SummarizeError, type ChatMessage, type CompletionResult } from '../llm/complete.js';
 import { config } from '../config.js';
@@ -50,7 +50,10 @@ export async function buildArticle(
     };
   }
 
-  const chunks = chunkTranscript(transcript, extracted.chapters, chunkChars);
+  // Рекламу, размеченную автором отдельной главой, вырезаем ДО нарезки: иначе её заголовок
+  // уедет модели как основа для раздела статьи, и она добросовестно этот раздел напишет.
+  const clean = stripAdChapters(transcript, extracted.chapters);
+  const chunks = chunkTranscript(clean, extracted.chapters, chunkChars);
   logger.info({ chunks: chunks.length, url: extracted.url }, 'собираю статью из расшифровки');
 
   const sections: string[] = [];

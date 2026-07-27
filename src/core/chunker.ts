@@ -1,4 +1,57 @@
+import { logger } from '../lib/logger.js';
 import type { Chapter, TranscriptSegment } from '../types.js';
+
+/**
+ * Главы, которые автор сам пометил как рекламные. Ловим только «самостоятельные» названия
+ * («Реклама», «Спонсор»), а не упоминания внутри темы («Реклама в играх») — иначе выкинем
+ * содержательный кусок видео про рекламу.
+ */
+// \p{L}*, а не \w*: с флагом u \w — это только ASCII, и «Спонсоры» бы не поймалось.
+const AD_CHAPTER =
+  /^(реклам\p{L}*|рекламная пауза|спонсор\p{L}*|промо|промокод|интеграция|ad|ads|ad break|adv|advertisement|sponsor\p{L}*|promo)$/iu;
+
+/** Название → буквы и пробелы, без эмодзи и пунктуации: «⚡ Реклама!» → «реклама». */
+function normalizeTitle(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^\p{L}\s]+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function isAdChapter(title: string): boolean {
+  return AD_CHAPTER.test(normalizeTitle(title));
+}
+
+/**
+ * Выбрасывает сегменты рекламных глав.
+ *
+ * Авторы YouTube часто размечают рекламу отдельной главой («Реклама», 4:34–6:18) — это
+ * куда надёжнее, чем надеяться, что модель распознает вставку. Более того, без этого мы
+ * сами передаём модели заголовок «Реклама» как основу для раздела статьи и получаем ровно
+ * то, что хотели убрать.
+ *
+ * chapterIndex у оставшихся сегментов не трогаем: он всё ещё индексирует исходный
+ * chapters[], а глава без сегментов просто не попадёт ни в один кусок.
+ */
+export function stripAdChapters(
+  transcript: TranscriptSegment[],
+  chapters: Chapter[] | undefined,
+): TranscriptSegment[] {
+  if (!chapters?.length) return transcript;
+
+  const adIndexes = new Set(
+    chapters.map((c, i) => (isAdChapter(c.title) ? i : -1)).filter((i) => i >= 0),
+  );
+  if (!adIndexes.size) return transcript;
+
+  const kept = transcript.filter((s) => !adIndexes.has(s.chapterIndex));
+  logger.info(
+    { dropped: transcript.length - kept.length, chapters: [...adIndexes].map((i) => chapters[i].title) },
+    'вырезаны рекламные главы',
+  );
+  return kept;
+}
 
 export interface ArticleChunk {
   /** Названия глав, попавших в кусок — подсказка модели для заголовков. Может быть пустым. */
