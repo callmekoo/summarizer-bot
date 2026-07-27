@@ -37,6 +37,27 @@ test('toTelegramHtml: содержимое кода тоже экранируе�
   assert.equal(toTelegramHtml('`a < b && c`'), '<code>a &lt; b &amp;&amp; c</code>');
 });
 
+test('toTelegramHtml: список `*   item` → буллет «• », лишние пробелы после маркера схлопываются', () => {
+  const out = toTelegramHtml('*   первый пункт;\n*   второй пункт.');
+  assert.equal(out, '• первый пункт;\n• второй пункт.');
+});
+
+test('toTelegramHtml: маркеры `-` и `+` тоже становятся «• »', () => {
+  assert.equal(toTelegramHtml('- пункт а\n+ пункт б'), '• пункт а\n• пункт б');
+});
+
+test('toTelegramHtml: отступ вложенного пункта списка сохраняется', () => {
+  assert.equal(toTelegramHtml('* верхний\n  * вложенный'), '• верхний\n  • вложенный');
+});
+
+test('toTelegramHtml: `**bold**` в начале строки не путается со списком', () => {
+  assert.equal(toTelegramHtml('**Заголовок**\nдалее'), '<b>Заголовок</b>\nдалее');
+});
+
+test('toTelegramHtml: одиночная звёздочка без пробела после — не список (не трогаем)', () => {
+  assert.equal(toTelegramHtml('*курсив* не наш формат'), '*курсив* не наш формат');
+});
+
 test('toTelegramHtml: строка `> …` → <blockquote>, содержимое экранируется', () => {
   assert.equal(toTelegramHtml('> цитата с <тегом>'), '<blockquote>цитата с &lt;тегом&gt;</blockquote>');
 });
