@@ -73,6 +73,10 @@ export async function onLink(ctx: Context): Promise<void> {
         promptTokens: result.usage?.prompt,
         completionTokens: result.usage?.completion,
         truncated: result.truncated,
+        // Просили / получили — по этой паре видно, слушается ли модель ориентира.
+        targetChars: result.budget.chars,
+        targetBlocks: result.budget.blocks,
+        actualChars: result.text.length,
         queuedAhead,
       },
       'request',

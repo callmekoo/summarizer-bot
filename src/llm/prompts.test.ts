@@ -27,8 +27,11 @@ before(async () => {
 
 const MARKERS = /⟦SOURCE ([0-9a-f]+)⟧\n([\s\S]*)\n⟦\/SOURCE ([0-9a-f]+)⟧/;
 
+// Бюджет считает summaryBudget (core/summarizer); здесь он неважен — берём фикстуру.
+const BUDGET = { chars: 1_700, blocks: 4 };
+
 test('userPrompt оборачивает текст в маркеры с совпадающим кодом', () => {
-  const out = userPrompt(undefined, 'тело статьи');
+  const out = userPrompt(undefined, 'тело статьи', BUDGET);
   const m = out.match(MARKERS);
   assert.ok(m, 'есть пара маркеров SOURCE');
   assert.equal(m[1], m[3], 'код открывающего и закрывающего маркера совпадает');
@@ -36,7 +39,7 @@ test('userPrompt оборачивает текст в маркеры с совп
 });
 
 test('userPrompt: заголовок попадает ВНУТРЬ блока (он тоже недоверенный)', () => {
-  const out = userPrompt('Заголовок от сайта', 'тело');
+  const out = userPrompt('Заголовок от сайта', 'тело', BUDGET);
   const m = out.match(MARKERS);
   assert.ok(m, 'есть маркеры');
   assert.ok(m[2].includes('Заголовок: Заголовок от сайта'), 'заголовок внутри блока');
@@ -44,15 +47,30 @@ test('userPrompt: заголовок попадает ВНУТРЬ блока (�
 });
 
 test('userPrompt: код случайный — разный между запросами', () => {
-  const a = userPrompt(undefined, 'x').match(MARKERS)?.[1];
-  const b = userPrompt(undefined, 'x').match(MARKERS)?.[1];
+  const a = userPrompt(undefined, 'x', BUDGET).match(MARKERS)?.[1];
+  const b = userPrompt(undefined, 'x', BUDGET).match(MARKERS)?.[1];
   assert.notEqual(a, b, 'код различается между вызовами');
 });
 
 test('userPrompt: инструкции к пересказу лежат СНАРУЖИ блока', () => {
-  const out = userPrompt(undefined, 'материал');
+  const out = userPrompt(undefined, 'материал', BUDGET);
   const closeIdx = out.indexOf('⟦/SOURCE');
   assert.ok(out.indexOf('Сделай краткий пересказ') > closeIdx, 'команда после закрытия блока');
+});
+
+test('userPrompt: ориентир по объёму доезжает до модели и лежит СНАРУЖИ блока', () => {
+  // Внутрь блока ориентир попасть не должен: там только недоверенные данные.
+  const out = userPrompt(undefined, 'материал', { chars: 2_900, blocks: 7 });
+  const closeIdx = out.indexOf('⟦/SOURCE');
+  assert.ok(out.includes('примерно 7 смысловых блоков'), 'число блоков в промпте');
+  assert.ok(out.includes('около 2900 символов'), 'целевой объём в промпте');
+  assert.ok(out.indexOf('Ориентир по объёму') > closeIdx, 'ориентир после закрытия блока');
+});
+
+test('userPrompt: blocks=0 → просим суть без блоков, а не «0 блоков»', () => {
+  const out = userPrompt(undefined, 'коротко', { chars: 500, blocks: 0 });
+  assert.ok(out.includes('2-4 предложений сути'), 'короткому тексту — связная суть');
+  assert.ok(!out.includes('смысловых блоков'), 'про блоки не заикаемся');
 });
 
 test('composeSystemPrompt: кастомный промпт НЕ теряет защиту', () => {
@@ -71,7 +89,7 @@ test('composeSystemPrompt: защита идёт ПОСЛЕ задачи (её �
 test('SAFETY_RULES описывают тот же маркер, что ставит userPrompt', () => {
   // Страховка от рассинхрона: правила ссылаются на маркер, обёртка его же и генерирует.
   assert.ok(SAFETY_RULES.includes('SOURCE'), 'правила упоминают маркер SOURCE');
-  assert.ok(userPrompt(undefined, 'x').includes('⟦SOURCE '), 'обёртка ставит маркер SOURCE');
+  assert.ok(userPrompt(undefined, 'x', BUDGET).includes('⟦SOURCE '), 'обёртка ставит маркер SOURCE');
 });
 
 test('промпт статьи тоже защищён: расшифровка видео — недоверенный текст', () => {
