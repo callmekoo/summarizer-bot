@@ -5,6 +5,7 @@ import { summarize, SummarizeError } from '../core/summarizer.js';
 import { toTelegramHtml, splitForTelegram, renderSourceHeader } from '../core/formatter.js';
 import type { ExtractResult } from '../types.js';
 import { createLimiter } from '../lib/concurrency.js';
+import { replyTo } from '../lib/reply.js';
 import { config } from '../config.js';
 import { logger } from '../lib/logger.js';
 
@@ -61,8 +62,16 @@ export async function onLink(ctx: Context): Promise<void> {
     const body = toTelegramHtml(result.text);
     const message = [header, notice, body].filter(Boolean).join('\n\n');
 
+    // Части выстраиваем цепочкой: первая отвечает на ссылку, каждая следующая — на
+    // предыдущую. Так пересказ читается по порядку, даже если чат уехал далеко вперёд.
+    let replyToId = ctx.message?.message_id;
     for (const chunk of splitForTelegram(message)) {
-      await ctx.reply(chunk, { parse_mode: 'HTML', link_preview_options: { is_disabled: true } });
+      const sent = await ctx.reply(chunk, {
+        parse_mode: 'HTML',
+        link_preview_options: { is_disabled: true },
+        ...replyTo(replyToId),
+      });
+      replyToId = sent.message_id;
     }
 
     // Метрики: одна строка на успешный запрос.
@@ -86,7 +95,7 @@ export async function onLink(ctx: Context): Promise<void> {
       'request',
     );
   } catch (err) {
-    await ctx.reply(userMessageForError(err));
+    await ctx.reply(userMessageForError(err), replyTo(ctx.message?.message_id));
     // Метрики: одна строка на неуспешный запрос (err тоже логируем для деталей).
     logger.error(
       {

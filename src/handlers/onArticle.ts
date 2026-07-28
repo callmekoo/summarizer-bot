@@ -7,6 +7,7 @@ import { renderSourceHeader } from '../core/formatter.js';
 import { articleFilename } from '../lib/filename.js';
 import { isVideo, type ExtractResult } from '../types.js';
 import { createLimiter } from '../lib/concurrency.js';
+import { replyTo } from '../lib/reply.js';
 import { config } from '../config.js';
 import { logger } from '../lib/logger.js';
 
@@ -61,7 +62,7 @@ export async function onArticle(ctx: Context): Promise<void> {
 
     await ctx.replyWithDocument(
       new InputFile(Buffer.from(result.markdown, 'utf8'), articleFilename(extracted?.title)),
-      { caption: caption + notice, parse_mode: 'HTML' },
+      { caption: caption + notice, parse_mode: 'HTML', ...replyTo(ctx.message?.message_id) },
     );
 
     logger.info(
@@ -82,7 +83,7 @@ export async function onArticle(ctx: Context): Promise<void> {
       'request',
     );
   } catch (err) {
-    await ctx.reply(userMessageForError(err));
+    await ctx.reply(userMessageForError(err), replyTo(ctx.message?.message_id));
     logger.error(
       {
         err,
