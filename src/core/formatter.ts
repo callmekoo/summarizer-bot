@@ -1,7 +1,7 @@
 const TG_LIMIT = 4096;
 
 /** Экранирует спецсимволы HTML, чтобы текст от модели не ломал разметку Telegram. */
-function escapeHtml(s: string): string {
+export function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 

@@ -8,6 +8,21 @@
   присылает `.md`-файлом (Telegram рендерит markdown-превью в клиенте). Это **не пересказ**:
   содержание сохраняется целиком, вырезаются только реклама и мусор устной речи.
 
+## Команды
+
+| Команда | Что делает |
+|---|---|
+| `/summary <ссылка>` | краткий пересказ статьи или видео в чат |
+| `/article <ссылка>` | видео → полная статья `.md`-файлом |
+| `/help` | список команд с пояснениями |
+| `/start` | краткое приветствие |
+
+Ссылку можно прислать и просто сообщением, без команды — это то же самое, что `/summary`.
+
+Список команд объявлен в [src/commands.ts](src/commands.ts) — оттуда его берут и меню
+Telegram (регистрируется при старте через `setMyCommands`, поэтому набор `/` подсказывает
+команды), и текст `/help`. Новая команда добавляется туда же, иначе тест упадёт.
+
 Извлечение текста — [rdrr](https://github.com/fkonovalov/rdrr), пересказ — LLM через
 **любой OpenAI-совместимый API** (по умолчанию [OpenRouter](https://openrouter.ai);
 меняется через `LLM_BASE_URL` + `LLM_API_KEY`). Подробный план — в [PLAN.md](PLAN.md).
@@ -212,8 +227,9 @@ rdrr уже вернул структурированный markdown. *Виде�
 src/
   bot.ts            точка входа (grammY, middleware, heartbeat, graceful shutdown)
   config.ts         env + валидация (zod)
+  commands.ts       список команд: меню Telegram + текст /help
   types.ts          ExtractResult
-  handlers/         хендлеры Telegram (onStart, onLink)
+  handlers/         хендлеры Telegram (onStart, onHelp, onLink, onArticle)
   middleware/       allowlist (Telegram ID), rateLimit (запросов/мин)
   core/             extractor, summarizer, formatter
   llm/              клиент OpenRouter + промпты

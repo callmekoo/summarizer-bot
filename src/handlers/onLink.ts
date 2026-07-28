@@ -16,7 +16,11 @@ export async function onLink(ctx: Context): Promise<void> {
   const text = ctx.message?.text ?? '';
   const url = extractUrl(text);
   if (!url) {
-    await ctx.reply('Пришли ссылку (http/https) на статью или YouTube-видео.');
+    // Сюда попадают и «/summary» без аргумента, и просто болтовня — единственное место,
+    // где человек, не нашедший меню команд, вообще узнает про /help.
+    await ctx.reply(
+      'Пришли ссылку (http/https) на статью или YouTube-видео.\n\nВсе команды — /help',
+    );
     return;
   }
 

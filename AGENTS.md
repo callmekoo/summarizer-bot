@@ -61,9 +61,11 @@ config). Сетевые вызовы (rdrr, OpenRouter) в юнит-тестах
 
 ```
 src/
-  bot.ts            точка входа: grammY, middleware, heartbeat, graceful shutdown
+  bot.ts            точка входа: grammY, middleware, heartbeat, graceful shutdown,
+                    регистрация меню команд (setMyCommands)
   config.ts         env + zod; падает с понятной ошибкой при невалидном .env
-  handlers/         onStart (/start, /help), onLink (пересказ), onArticle (/article)
+  commands.ts       реестр команд: имена, описания, renderHelp(). Хендлеров тут нет
+  handlers/         onStart, onHelp, onLink (/summary + текст), onArticle (/article)
   middleware/       allowlist (ALLOWED_USER_IDS), rateLimit (RATE_LIMIT_PER_MIN)
   core/
     extractor.ts    rdrr.parse(url) с таймаутом + 3 ретрая; ошибки → ExtractError(kind).
@@ -105,6 +107,13 @@ src/
   текст) — особый случай: просим связную суть без блоков вовсе. Кривая правится константами
   в `summarizer.ts`, контрольные точки прибиты тестами. Ловится по логам: `targetChars`
   против `actualChars` в строке `request`.
+- **Новая команда добавляется в двух местах:** `commands.ts` (имя, описание, справка) и
+  `bot.command()` в `bot.ts` (хендлер). Хендлеры в реестр не кладём: `/help` нужен список,
+  а списку — хендлер `/help`, вышел бы цикл импортов (тот же приём, что с `SummaryBudget`).
+  От рассинхрона страхует тест в `commands.test.ts`: он **читает исходник `bot.ts`** и
+  сверяет имена из `bot.command('…')` с реестром. Импортировать `bot.ts` в тесте нельзя —
+  на верхнем уровне он поднимает polling. Регистрации должны идти **до**
+  `bot.on('message:text')`, иначе `/summary <url>` съест общий обработчик текста.
 - **Вызывать LLM только через `llm/complete.ts`.** Логика фолбэков и 429 тонкая — не дублируй.
 - **Реклама в главах видео.** Авторы часто размечают рекламу отдельной главой («Реклама»).
   Мы передаём названия глав модели как основу для заголовков — то есть без фильтра сами
@@ -146,6 +155,10 @@ fallback-модель + повтор по 429, очередь `MAX_CONCURRENCY`,
 
 Готова команда **`/article`** (Этап 5): видео → статья в `.md`, с нарезкой по главам
 (`chunker.ts`), вырезанием рекламы и настройкой промпта через `ARTICLE_PROMPT_FILE`.
+
+Команды бота подсказываются сами (Этап 6): реестр в `commands.ts` → меню Telegram
+(`setMyCommands`) + `/help`. Пересказ получил явное имя `/summary`, `/start` ужался до
+приветствия. Текст со ссылкой без команды по-прежнему идёт в пересказ.
 
 Открыто (см. [PLAN.md](PLAN.md)):
 - **webhook** вместо polling — и тогда healthcheck переделать на HTTP `/health`;

@@ -3,8 +3,10 @@ import { Bot } from 'grammy';
 import { config } from './config.js';
 import { logger } from './lib/logger.js';
 import { onStart } from './handlers/onStart.js';
+import { onHelp } from './handlers/onHelp.js';
 import { onLink } from './handlers/onLink.js';
 import { onArticle } from './handlers/onArticle.js';
+import { COMMANDS } from './commands.js';
 import { allowlist } from './middleware/allowlist.js';
 import { rateLimit } from './middleware/rateLimit.js';
 
@@ -18,10 +20,13 @@ if (config.ALLOWED_USER_IDS.length === 0) {
 
 bot.use(allowlist);
 bot.use(rateLimit);
-bot.command('start', onStart);
-bot.command('help', onStart);
+// Имена и описания команд — в commands.ts (там же берёт их меню Telegram и /help).
 // Команды разбираются до общего обработчика текста, иначе `/article <url>` уйдёт в пересказ.
+bot.command('summary', onLink);
 bot.command('article', onArticle);
+bot.command('help', onHelp);
+bot.command('start', onStart);
+// Ссылка без команды = пересказ: extractUrl вытащит её из любого текста.
 bot.on('message:text', onLink);
 
 bot.catch((err) => {
@@ -54,6 +59,11 @@ process.once('SIGTERM', shutdown);
 bot.start({
   onStart: (me) => {
     writeHeartbeat();
+    // Меню у поля ввода: без регистрации набор «/» не подсказывает ничего. Вызов сетевой,
+    // но бот без меню вполне работоспособен — падать из-за него не за что, только warn.
+    void bot.api
+      .setMyCommands(COMMANDS.map(({ command, description }) => ({ command, description })))
+      .catch((err: unknown) => logger.warn({ err }, 'не удалось зарегистрировать меню команд'));
     logger.info({ username: me.username }, 'бот запущен');
   },
 });
