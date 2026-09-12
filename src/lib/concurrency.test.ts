@@ -26,10 +26,12 @@ test('createLimiter(1) сериализует и сохраняет порядо
   const limiter = createLimiter(1);
   const order: number[] = [];
   await Promise.all(
-    [1, 2, 3].map((n) => limiter.run(async () => {
-      await tick();
-      order.push(n);
-    })),
+    [1, 2, 3].map((n) =>
+      limiter.run(async () => {
+        await tick();
+        order.push(n);
+      }),
+    ),
   );
   assert.deepEqual(order, [1, 2, 3]);
 });
@@ -37,9 +39,13 @@ test('createLimiter(1) сериализует и сохраняет порядо
 test('createLimiter пробрасывает результат и ошибку', async () => {
   const limiter = createLimiter(1);
   assert.equal(await limiter.run(async () => 42), 42);
-  await assert.rejects(() => limiter.run(async () => {
-    throw new Error('boom');
-  }), /boom/);
+  await assert.rejects(
+    () =>
+      limiter.run(async () => {
+        throw new Error('boom');
+      }),
+    /boom/,
+  );
   // после ошибки слот освобождается — следующая задача выполняется
   assert.equal(await limiter.run(async () => 'ok'), 'ok');
 });

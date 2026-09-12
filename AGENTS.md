@@ -40,7 +40,8 @@ npm run dev
 npm run dev        # tsx watch — разработка
 npm run typecheck  # tsc --noEmit (включая тесты)
 npm test           # node:test через tsx — юнит-тесты (src/**/*.test.ts)
-npm run check      # typecheck + test одной командой (запускай перед коммитом)
+npm run format     # prettier --write . (конфиг — .prettierrc.json)
+npm run check      # typecheck + test + format:check (запускай перед коммитом)
 npm run build      # tsc -p tsconfig.build.json → dist/ (без *.test.ts)
 npm start          # node dist/bot.js (прод)
 ```
@@ -87,6 +88,12 @@ src/
 
 ## Соглашения и подводные камни
 
+- **`npm run check` гоняет хук** (`.claude/hooks/check.sh`, событие Stop в
+  `.claude/settings.json`): после каждого ответа Claude, и при падении возвращает ему
+  строки с ошибками. Руками из агента запускать не нужно.
+- **Форматирование — prettier** (`.prettierrc.json`: одинарные кавычки, ширина 80;
+  в YAML кавычки не трогаем). Markdown под `.prettierignore` — доки свёрстаны руками.
+  `npm run check` падает на неотформатированном коде.
 - **ESM-импорты с расширением `.js`** (требование NodeNext), даже для `.ts`-файлов.
 - **rdrr**: текст лежит в поле `content` (не `markdown`); `title`/`wordCount`/`type` —
   на верхнем уровне `ParseResult`. Грузим динамически (`await import('rdrr')`).

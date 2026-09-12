@@ -1,6 +1,9 @@
 import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
-import type { buildArticle as BuildArticle, renderArticleMd as RenderArticleMd } from './article.js';
+import type {
+  buildArticle as BuildArticle,
+  renderArticleMd as RenderArticleMd,
+} from './article.js';
 import type { ExtractResult } from '../types.js';
 
 // article → prompts → config валидирует env при импорте: задаём окружение заранее
@@ -54,10 +57,19 @@ test('не видео → тело от rdrr под нашей шапкой, LLM
 
   assert.equal(called, false, 'LLM не вызывалась');
   assert.equal(result.chunks, 0);
-  assert.ok(result.markdown.includes('Текст страницы.'), 'тело от rdrr на месте');
+  assert.ok(
+    result.markdown.includes('Текст страницы.'),
+    'тело от rdrr на месте',
+  );
   // rdrr отдаёт для страниц голое тело — заголовок и ссылку добавляем мы.
-  assert.ok(result.markdown.startsWith('# Заголовок видео'), 'шапка с заголовком добавлена');
-  assert.ok(result.markdown.includes('[Источник]'), 'ссылка на источник добавлена');
+  assert.ok(
+    result.markdown.startsWith('# Заголовок видео'),
+    'шапка с заголовком добавлена',
+  );
+  assert.ok(
+    result.markdown.includes('[Источник]'),
+    'ссылка на источник добавлена',
+  );
 });
 
 test('видео → расшифровка разворачивается в статью через LLM', async () => {
@@ -65,13 +77,19 @@ test('видео → расшифровка разворачивается в с
   assert.equal(result.chunks, 1, 'короткая расшифровка → один кусок');
   assert.equal(result.failedChunks, 0);
   assert.equal(result.model, 'test/model');
-  assert.ok(result.markdown.includes('# Заголовок видео'), 'шапка с заголовком');
+  assert.ok(
+    result.markdown.includes('# Заголовок видео'),
+    'шапка с заголовком',
+  );
   assert.ok(result.markdown.includes('## Раздел'), 'тело от модели');
 });
 
 test('прогресс сообщается по каждому куску', async () => {
   const calls: string[] = [];
-  await buildArticle(video, { llm: okLlm, onProgress: (d, t) => calls.push(`${d}/${t}`) });
+  await buildArticle(video, {
+    llm: okLlm,
+    onProgress: (d, t) => calls.push(`${d}/${t}`),
+  });
   assert.deepEqual(calls, ['1/1']);
 });
 
@@ -87,7 +105,10 @@ test('упавший кусок помечается, но статья всё �
   const result = await buildArticle(video, { llm: flakyLlm, chunkChars: 20 });
   assert.equal(result.chunks, 2, 'расшифровка разрезана надвое');
   assert.equal(result.failedChunks, 1, 'один кусок не дался');
-  assert.ok(result.markdown.includes('⚠️ Не удалось обработать фрагмент 1'), 'пропуск помечен');
+  assert.ok(
+    result.markdown.includes('⚠️ Не удалось обработать фрагмент 1'),
+    'пропуск помечен',
+  );
   assert.ok(result.markdown.includes('Готовый раздел.'), 'остальное на месте');
 });
 
@@ -106,6 +127,9 @@ test('renderArticleMd: шапка с заголовком, автором и с�
   const md = renderArticleMd(video, '## Раздел\n\nТело.');
   assert.ok(md.startsWith('# Заголовок видео'), 'начинается с H1');
   assert.ok(md.includes('*Автор · YouTube*'), 'подпись');
-  assert.ok(md.includes('[Источник](https://youtu.be/x)'), 'ссылка на источник');
+  assert.ok(
+    md.includes('[Источник](https://youtu.be/x)'),
+    'ссылка на источник',
+  );
   assert.ok(md.includes('## Раздел'), 'тело');
 });

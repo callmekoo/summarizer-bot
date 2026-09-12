@@ -21,8 +21,13 @@ before(async () => {
   process.env.BOT_TOKEN = 'test-token';
   process.env.LLM_API_KEY = 'test-key';
   process.env.MODEL = 'test/model';
-  ({ userPrompt, articleUserPrompt, composeSystemPrompt, SAFETY_RULES, ARTICLE_SYSTEM_PROMPT } =
-    await import('./prompts.js'));
+  ({
+    userPrompt,
+    articleUserPrompt,
+    composeSystemPrompt,
+    SAFETY_RULES,
+    ARTICLE_SYSTEM_PROMPT,
+  } = await import('./prompts.js'));
 });
 
 const MARKERS = /⟦SOURCE ([0-9a-f]+)⟧\n([\s\S]*)\n⟦\/SOURCE ([0-9a-f]+)⟧/;
@@ -42,7 +47,10 @@ test('userPrompt: заголовок попадает ВНУТРЬ блока (�
   const out = userPrompt('Заголовок от сайта', 'тело', BUDGET);
   const m = out.match(MARKERS);
   assert.ok(m, 'есть маркеры');
-  assert.ok(m[2].includes('Заголовок: Заголовок от сайта'), 'заголовок внутри блока');
+  assert.ok(
+    m[2].includes('Заголовок: Заголовок от сайта'),
+    'заголовок внутри блока',
+  );
   assert.ok(m[2].includes('тело'));
 });
 
@@ -55,28 +63,43 @@ test('userPrompt: код случайный — разный между запр
 test('userPrompt: инструкции к пересказу лежат СНАРУЖИ блока', () => {
   const out = userPrompt(undefined, 'материал', BUDGET);
   const closeIdx = out.indexOf('⟦/SOURCE');
-  assert.ok(out.indexOf('Сделай краткий пересказ') > closeIdx, 'команда после закрытия блока');
+  assert.ok(
+    out.indexOf('Сделай краткий пересказ') > closeIdx,
+    'команда после закрытия блока',
+  );
 });
 
 test('userPrompt: ориентир по объёму доезжает до модели и лежит СНАРУЖИ блока', () => {
   // Внутрь блока ориентир попасть не должен: там только недоверенные данные.
   const out = userPrompt(undefined, 'материал', { chars: 2_900, blocks: 7 });
   const closeIdx = out.indexOf('⟦/SOURCE');
-  assert.ok(out.includes('примерно 7 смысловых блоков'), 'число блоков в промпте');
+  assert.ok(
+    out.includes('примерно 7 смысловых блоков'),
+    'число блоков в промпте',
+  );
   assert.ok(out.includes('около 2900 символов'), 'целевой объём в промпте');
-  assert.ok(out.indexOf('Ориентир по объёму') > closeIdx, 'ориентир после закрытия блока');
+  assert.ok(
+    out.indexOf('Ориентир по объёму') > closeIdx,
+    'ориентир после закрытия блока',
+  );
 });
 
 test('userPrompt: blocks=0 → просим суть без блоков, а не «0 блоков»', () => {
   const out = userPrompt(undefined, 'коротко', { chars: 500, blocks: 0 });
-  assert.ok(out.includes('2-4 предложений сути'), 'короткому тексту — связная суть');
+  assert.ok(
+    out.includes('2-4 предложений сути'),
+    'короткому тексту — связная суть',
+  );
   assert.ok(!out.includes('смысловых блоков'), 'про блоки не заикаемся');
 });
 
 test('composeSystemPrompt: кастомный промпт НЕ теряет защиту', () => {
   // Главный регресс-тест: автор кастомного промпта не знает о защите, но получает её.
   const out = composeSystemPrompt('Перескажи текст в три предложения.');
-  assert.ok(out.includes('Перескажи текст в три предложения.'), 'кастомная задача на месте');
+  assert.ok(
+    out.includes('Перескажи текст в три предложения.'),
+    'кастомная задача на месте',
+  );
   assert.ok(out.includes(SAFETY_RULES), 'правила защиты подмешаны');
 });
 
@@ -89,15 +112,25 @@ test('composeSystemPrompt: защита идёт ПОСЛЕ задачи (её �
 test('SAFETY_RULES описывают тот же маркер, что ставит userPrompt', () => {
   // Страховка от рассинхрона: правила ссылаются на маркер, обёртка его же и генерирует.
   assert.ok(SAFETY_RULES.includes('SOURCE'), 'правила упоминают маркер SOURCE');
-  assert.ok(userPrompt(undefined, 'x', BUDGET).includes('⟦SOURCE '), 'обёртка ставит маркер SOURCE');
+  assert.ok(
+    userPrompt(undefined, 'x', BUDGET).includes('⟦SOURCE '),
+    'обёртка ставит маркер SOURCE',
+  );
 });
 
 test('промпт статьи тоже защищён: расшифровка видео — недоверенный текст', () => {
-  assert.ok(ARTICLE_SYSTEM_PROMPT.includes(SAFETY_RULES), 'SAFETY_RULES подмешаны и в статью');
+  assert.ok(
+    ARTICLE_SYSTEM_PROMPT.includes(SAFETY_RULES),
+    'SAFETY_RULES подмешаны и в статью',
+  );
 });
 
 test('articleUserPrompt: текст куска обёрнут нонс-маркерами с совпадающим кодом', () => {
-  const out = articleUserPrompt('речь из видео', { index: 1, total: 3, chapterTitles: [] });
+  const out = articleUserPrompt('речь из видео', {
+    index: 1,
+    total: 3,
+    chapterTitles: [],
+  });
   const m = out.match(MARKERS);
   assert.ok(m, 'есть пара маркеров');
   assert.equal(m[1], m[3], 'коды совпадают');
@@ -105,9 +138,16 @@ test('articleUserPrompt: текст куска обёрнут нонс-марк�
 });
 
 test('articleUserPrompt: инструкции лежат СНАРУЖИ блока', () => {
-  const out = articleUserPrompt('речь', { index: 1, total: 1, chapterTitles: [] });
+  const out = articleUserPrompt('речь', {
+    index: 1,
+    total: 1,
+    chapterTitles: [],
+  });
   const closeIdx = out.indexOf('⟦/SOURCE');
-  assert.ok(out.indexOf('Преврати расшифровку выше') > closeIdx, 'команда после закрытия блока');
+  assert.ok(
+    out.indexOf('Преврати расшифровку выше') > closeIdx,
+    'команда после закрытия блока',
+  );
 });
 
 test('articleUserPrompt: названия глав передаются модели, номер фрагмента — тоже', () => {
@@ -117,10 +157,17 @@ test('articleUserPrompt: названия глав передаются моде
     chapterTitles: ['Вступление', 'Итоги'],
   });
   assert.ok(out.includes('фрагмент 2 из 5'), 'позиция куска');
-  assert.ok(out.includes('- Вступление') && out.includes('- Итоги'), 'главы перечислены');
+  assert.ok(
+    out.includes('- Вступление') && out.includes('- Итоги'),
+    'главы перечислены',
+  );
 });
 
 test('articleUserPrompt: глав нет → модель придумывает заголовки сама', () => {
-  const out = articleUserPrompt('речь', { index: 1, total: 1, chapterTitles: [] });
+  const out = articleUserPrompt('речь', {
+    index: 1,
+    total: 1,
+    chapterTitles: [],
+  });
   assert.ok(out.includes('придумай заголовки'), 'сказано придумать заголовки');
 });

@@ -13,7 +13,9 @@ import { rateLimit } from './middleware/rateLimit.js';
 const bot = new Bot(config.BOT_TOKEN);
 
 if (config.ALLOWED_USER_IDS.length === 0) {
-  logger.warn('ALLOWED_USER_IDS пуст — бот отвечает всем. Укажи свой Telegram ID в .env.');
+  logger.warn(
+    'ALLOWED_USER_IDS пуст — бот отвечает всем. Укажи свой Telegram ID в .env.',
+  );
 } else {
   logger.info({ count: config.ALLOWED_USER_IDS.length }, 'allowlist включён');
 }
@@ -39,7 +41,10 @@ function writeHeartbeat(): void {
   try {
     writeFileSync(config.HEARTBEAT_FILE, String(Date.now()));
   } catch (err) {
-    logger.warn({ err, file: config.HEARTBEAT_FILE }, 'не удалось записать heartbeat');
+    logger.warn(
+      { err, file: config.HEARTBEAT_FILE },
+      'не удалось записать heartbeat',
+    );
   }
 }
 
@@ -56,8 +61,15 @@ let stopping = false;
 const shutdown = (): void => {
   stopping = true;
   clearInterval(heartbeat);
-  setTimeout(() => process.exit(process.exitCode ?? 0), SHUTDOWN_TIMEOUT_MS).unref();
-  bot.stop().catch((err: unknown) => logger.warn({ err }, 'остановка поллинга с ошибкой'));
+  setTimeout(
+    () => process.exit(process.exitCode ?? 0),
+    SHUTDOWN_TIMEOUT_MS,
+  ).unref();
+  bot
+    .stop()
+    .catch((err: unknown) =>
+      logger.warn({ err }, 'остановка поллинга с ошибкой'),
+    );
 };
 process.once('SIGINT', shutdown);
 process.once('SIGTERM', shutdown);
@@ -68,8 +80,15 @@ bot
       writeHeartbeat();
       // Меню у поля ввода. Сетевой вызов, но без меню бот работоспособен — только warn.
       void bot.api
-        .setMyCommands(COMMANDS.map(({ command, description }) => ({ command, description })))
-        .catch((err: unknown) => logger.warn({ err }, 'не удалось зарегистрировать меню команд'));
+        .setMyCommands(
+          COMMANDS.map(({ command, description }) => ({
+            command,
+            description,
+          })),
+        )
+        .catch((err: unknown) =>
+          logger.warn({ err }, 'не удалось зарегистрировать меню команд'),
+        );
       logger.info({ username: me.username }, 'бот запущен');
     },
   })

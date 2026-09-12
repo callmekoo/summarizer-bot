@@ -20,7 +20,10 @@ test('retryAfterMs: заголовок в нативном Headers (форма o
 });
 
 test('retryAfterMs: заголовок обычным объектом (старая форма и моки)', () => {
-  assert.equal(retryAfterMs({ status: 429, headers: { 'retry-after': '3' } }), 3_000);
+  assert.equal(
+    retryAfterMs({ status: 429, headers: { 'retry-after': '3' } }),
+    3_000,
+  );
 });
 
 test('retryAfterMs: metadata OpenRouter важнее заголовка', () => {

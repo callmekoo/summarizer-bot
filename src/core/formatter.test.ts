@@ -1,6 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { toTelegramHtml, splitForTelegram, renderSourceHeader } from './formatter.js';
+import {
+  toTelegramHtml,
+  splitForTelegram,
+  renderSourceHeader,
+} from './formatter.js';
 
 test('toTelegramHtml экранирует спецсимволы HTML', () => {
   const out = toTelegramHtml('теги <div> и & «амперсанд» > конец');
@@ -34,7 +38,10 @@ test('toTelegramHtml: блок ```…``` → <pre>, тег языка отбро
 });
 
 test('toTelegramHtml: содержимое кода тоже экранируется', () => {
-  assert.equal(toTelegramHtml('`a < b && c`'), '<code>a &lt; b &amp;&amp; c</code>');
+  assert.equal(
+    toTelegramHtml('`a < b && c`'),
+    '<code>a &lt; b &amp;&amp; c</code>',
+  );
 });
 
 test('toTelegramHtml: список `*   item` → буллет «• », лишние пробелы после маркера схлопываются', () => {
@@ -47,19 +54,31 @@ test('toTelegramHtml: маркеры `-` и `+` тоже становятся «
 });
 
 test('toTelegramHtml: отступ вложенного пункта списка сохраняется', () => {
-  assert.equal(toTelegramHtml('* верхний\n  * вложенный'), '• верхний\n  • вложенный');
+  assert.equal(
+    toTelegramHtml('* верхний\n  * вложенный'),
+    '• верхний\n  • вложенный',
+  );
 });
 
 test('toTelegramHtml: `**bold**` в начале строки не путается со списком', () => {
-  assert.equal(toTelegramHtml('**Заголовок**\nдалее'), '<b>Заголовок</b>\nдалее');
+  assert.equal(
+    toTelegramHtml('**Заголовок**\nдалее'),
+    '<b>Заголовок</b>\nдалее',
+  );
 });
 
 test('toTelegramHtml: одиночная звёздочка без пробела после — не список (не трогаем)', () => {
-  assert.equal(toTelegramHtml('*курсив* не наш формат'), '*курсив* не наш формат');
+  assert.equal(
+    toTelegramHtml('*курсив* не наш формат'),
+    '*курсив* не наш формат',
+  );
 });
 
 test('toTelegramHtml: строка `> …` → <blockquote>, содержимое экранируется', () => {
-  assert.equal(toTelegramHtml('> цитата с <тегом>'), '<blockquote>цитата с &lt;тегом&gt;</blockquote>');
+  assert.equal(
+    toTelegramHtml('> цитата с <тегом>'),
+    '<blockquote>цитата с &lt;тегом&gt;</blockquote>',
+  );
 });
 
 test('toTelegramHtml: подряд идущие `> …` сливаются в один blockquote', () => {
@@ -69,7 +88,10 @@ test('toTelegramHtml: подряд идущие `> …` сливаются в о
 
 test('toTelegramHtml: цитата среди обычного текста, разметка внутри работает', () => {
   const out = toTelegramHtml('До.\n> цитата с **акцентом**\nПосле.');
-  assert.equal(out, 'До.\n<blockquote>цитата с <b>акцентом</b></blockquote>\nПосле.');
+  assert.equal(
+    out,
+    'До.\n<blockquote>цитата с <b>акцентом</b></blockquote>\nПосле.',
+  );
 });
 
 test('splitForTelegram не трогает короткий текст', () => {
@@ -80,7 +102,8 @@ test('splitForTelegram режет по границам строк, каждая
   const text = Array.from({ length: 50 }, (_, i) => `строка ${i}`).join('\n');
   const parts = splitForTelegram(text, 30);
   assert.ok(parts.length > 1, 'текст разбит на несколько частей');
-  for (const p of parts) assert.ok(p.length <= 30, `часть в пределах лимита: "${p}"`);
+  for (const p of parts)
+    assert.ok(p.length <= 30, `часть в пределах лимита: "${p}"`);
   // Склейка обратно даёт исходные строки (границы — переводы строк).
   assert.deepEqual(parts.join('\n').split('\n'), text.split('\n'));
 });
@@ -104,7 +127,10 @@ test('renderSourceHeader: заголовок-ссылка + сайт + авто�
     author: 'Иван',
     site: 'Хабр',
   });
-  assert.equal(h, '<a href="https://habr.com/p/1"><b>Заголовок</b></a>\n🌐 Хабр · ✍️ Иван');
+  assert.equal(
+    h,
+    '<a href="https://habr.com/p/1"><b>Заголовок</b></a>\n🌐 Хабр · ✍️ Иван',
+  );
 });
 
 test('renderSourceHeader экранирует html в полях и href', () => {
@@ -113,15 +139,24 @@ test('renderSourceHeader экранирует html в полях и href', () =>
     title: 'A <b> & "C"',
     site: 'Site & Co',
   });
-  assert.ok(h.includes('href="https://x.test/?a=1&amp;b=2"'), 'амперсанд в href экранирован');
+  assert.ok(
+    h.includes('href="https://x.test/?a=1&amp;b=2"'),
+    'амперсанд в href экранирован',
+  );
   // В тексте элемента экранируем только < > &; кавычки внутри текста допустимы как есть.
-  assert.ok(h.includes('<b>A &lt;b&gt; &amp; "C"</b>'), 'текст заголовка экранирован');
+  assert.ok(
+    h.includes('<b>A &lt;b&gt; &amp; "C"</b>'),
+    'текст заголовка экранирован',
+  );
   assert.ok(h.includes('🌐 Site &amp; Co'));
   assert.ok(!h.includes('✍️'), 'автора нет — строка без него');
 });
 
 test('renderSourceHeader: только сайт, без заголовка', () => {
-  assert.equal(renderSourceHeader({ url: 'https://x.test', site: 'X' }), '🌐 X');
+  assert.equal(
+    renderSourceHeader({ url: 'https://x.test', site: 'X' }),
+    '🌐 X',
+  );
 });
 
 test('renderSourceHeader: нет метаданных → пустая строка', () => {

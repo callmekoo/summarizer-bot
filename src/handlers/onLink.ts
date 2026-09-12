@@ -2,7 +2,11 @@ import type { Context } from 'grammy';
 import { extractUrl } from '../lib/url.js';
 import { extract, ExtractError } from '../core/extractor.js';
 import { summarize, SummarizeError } from '../core/summarizer.js';
-import { toTelegramHtml, splitForTelegram, renderSourceHeader } from '../core/formatter.js';
+import {
+  toTelegramHtml,
+  splitForTelegram,
+  renderSourceHeader,
+} from '../core/formatter.js';
 import type { ExtractResult } from '../types.js';
 import { createLimiter } from '../lib/concurrency.js';
 import { replyTo } from '../lib/reply.js';
@@ -112,7 +116,9 @@ export async function onLink(ctx: Context): Promise<void> {
     );
   } finally {
     clearInterval(typing);
-    await ctx.api.deleteMessage(status.chat.id, status.message_id).catch(() => {});
+    await ctx.api
+      .deleteMessage(status.chat.id, status.message_id)
+      .catch(() => {});
   }
 }
 

@@ -3,16 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "engines": {
-    "node": ">=22.12"
-  },
   "scripts": {
-    "dev": "tsx watch src/bot.ts",
     "build": "tsc -p tsconfig.build.json",
+    "check": "npm run typecheck && npm test && npm run format:check",
+    "dev": "tsx watch src/bot.ts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "start": "node dist/bot.js",
-    "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test \"src/**/*.test.ts\"",
-    "check": "npm run typecheck && npm test"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "dotenv": "^17.4.2",
@@ -24,7 +23,11 @@
   },
   "devDependencies": {
     "@types/node": "^22.20.2",
+    "prettier": "^3.9.6",
     "tsx": "^4.23.13",
     "typescript": "^7.0.2"
+  },
+  "engines": {
+    "node": ">=22.12"
   }
 }

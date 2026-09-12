@@ -1,6 +1,11 @@
 import { chunkTranscript, stripAdChapters } from './chunker.js';
 import { ARTICLE_SYSTEM_PROMPT, articleUserPrompt } from '../llm/prompts.js';
-import { complete, SummarizeError, type ChatMessage, type CompletionResult } from '../llm/complete.js';
+import {
+  complete,
+  SummarizeError,
+  type ChatMessage,
+  type CompletionResult,
+} from '../llm/complete.js';
 import { config } from '../config.js';
 import { logger } from '../lib/logger.js';
 import { isVideo, type ExtractResult } from '../types.js';
@@ -37,7 +42,11 @@ export async function buildArticle(
   extracted: ExtractResult,
   options: BuildArticleOptions = {},
 ): Promise<ArticleResult> {
-  const { onProgress, llm = complete, chunkChars = config.ARTICLE_CHUNK_CHARS } = options;
+  const {
+    onProgress,
+    llm = complete,
+    chunkChars = config.ARTICLE_CHUNK_CHARS,
+  } = options;
   const transcript = extracted.transcript ?? [];
 
   // Не видео (или видео без сегментов) — текст уже структурирован, LLM не нужна. Шапку
@@ -54,7 +63,10 @@ export async function buildArticle(
   // уедет модели как основа для раздела статьи, и она добросовестно этот раздел напишет.
   const clean = stripAdChapters(transcript, extracted.chapters);
   const chunks = chunkTranscript(clean, extracted.chapters, chunkChars);
-  logger.info({ chunks: chunks.length, url: extracted.url }, 'собираю статью из расшифровки');
+  logger.info(
+    { chunks: chunks.length, url: extracted.url },
+    'собираю статью из расшифровки',
+  );
 
   const sections: string[] = [];
   let failedChunks = 0;
@@ -79,15 +91,23 @@ export async function buildArticle(
       // Один упавший кусок не должен обнулять минуты уже сделанной работы: помечаем
       // пропуск и продолжаем, а пользователю отдаём частичную статью.
       failedChunks++;
-      sections.push(`> ⚠️ Не удалось обработать фрагмент ${i + 1} из ${chunks.length}.`);
-      logger.warn({ err, chunk: i + 1, url: extracted.url }, 'фрагмент статьи не обработан');
+      sections.push(
+        `> ⚠️ Не удалось обработать фрагмент ${i + 1} из ${chunks.length}.`,
+      );
+      logger.warn(
+        { err, chunk: i + 1, url: extracted.url },
+        'фрагмент статьи не обработан',
+      );
     }
     onProgress?.(i + 1, chunks.length);
   }
 
   // Не дался ни один кусок — отдавать нечего, это честная ошибка.
   if (failedChunks === chunks.length) {
-    throw new SummarizeError('failed', 'не удалось обработать ни одного фрагмента расшифровки');
+    throw new SummarizeError(
+      'failed',
+      'не удалось обработать ни одного фрагмента расшифровки',
+    );
   }
 
   return {

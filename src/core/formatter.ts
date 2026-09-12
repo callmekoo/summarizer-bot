@@ -25,7 +25,9 @@ export function renderSourceHeader(meta: SourceMeta): string {
   const lines: string[] = [];
 
   if (meta.title) {
-    lines.push(`<a href="${escapeAttr(meta.url)}"><b>${escapeHtml(meta.title)}</b></a>`);
+    lines.push(
+      `<a href="${escapeAttr(meta.url)}"><b>${escapeHtml(meta.title)}</b></a>`,
+    );
   }
 
   const sub: string[] = [];
@@ -46,7 +48,10 @@ export function toTelegramHtml(text: string): string {
   let s = escapeHtml(text.trim());
   // Блоки кода ```…``` → <pre> (до инлайна, чтобы тройные бэктики не съел `…`).
   // Необязательный тег языка после ``` отбрасываем.
-  s = s.replace(/```[^\n`]*\n?([\s\S]*?)```/g, (_m, code: string) => `<pre>${code.replace(/\n+$/, '')}</pre>`);
+  s = s.replace(
+    /```[^\n`]*\n?([\s\S]*?)```/g,
+    (_m, code: string) => `<pre>${code.replace(/\n+$/, '')}</pre>`,
+  );
   // Списки: строки `* item`, `- item`, `+ item` (маркер модель иногда добивает пробелами
   // до колонки, отсюда `[ \t]+`) → буллет «• », с сохранением отступа вложенных пунктов.
   s = s.replace(/^([ \t]*)[*+-][ \t]+(?=\S)/gm, '$1• ');

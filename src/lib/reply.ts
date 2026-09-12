@@ -13,5 +13,10 @@ export function replyTo(messageId: number | undefined): {
   reply_parameters?: { message_id: number; allow_sending_without_reply: true };
 } {
   if (!messageId) return {};
-  return { reply_parameters: { message_id: messageId, allow_sending_without_reply: true } };
+  return {
+    reply_parameters: {
+      message_id: messageId,
+      allow_sending_without_reply: true,
+    },
+  };
 }

@@ -8,7 +8,11 @@ test('пропускает до max обращений в окне', () => {
   assert.equal(rl.check('u', 100).allowed, true);
   const denied = rl.check('u', 200);
   assert.equal(denied.allowed, false);
-  assert.equal(denied.retryAfterMs, 800, 'retryAfter = когда выпадет самый старый хит');
+  assert.equal(
+    denied.retryAfterMs,
+    800,
+    'retryAfter = когда выпадет самый старый хит',
+  );
 });
 
 test('окно скользит: после истечения снова можно', () => {
@@ -21,7 +25,11 @@ test('окно скользит: после истечения снова мож
 test('ключи независимы', () => {
   const rl = createRateLimiter(1, 1000);
   assert.equal(rl.check('a', 0).allowed, true);
-  assert.equal(rl.check('b', 0).allowed, true, 'другой пользователь не затронут');
+  assert.equal(
+    rl.check('b', 0).allowed,
+    true,
+    'другой пользователь не затронут',
+  );
   assert.equal(rl.check('a', 0).allowed, false);
 });
 

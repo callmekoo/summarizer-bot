@@ -18,7 +18,9 @@ const pipeline = createLimiter(config.MAX_CONCURRENCY);
 export async function onArticle(ctx: Context): Promise<void> {
   const url = extractUrl(ctx.message?.text ?? '');
   if (!url) {
-    await ctx.reply('Пришли ссылку вместе с командой:\n/article https://youtube.com/watch?v=…');
+    await ctx.reply(
+      'Пришли ссылку вместе с командой:\n/article https://youtube.com/watch?v=…',
+    );
     return;
   }
 
@@ -43,7 +45,8 @@ export async function onArticle(ctx: Context): Promise<void> {
       const article = await buildArticle(extracted, {
         onProgress: (done, total) => {
           // Длинное видео идёт минутами — без прогресса непонятно, жив ли бот.
-          if (total > 1) void editStatus(ctx, status, `⏳ Собираю статью… ${done}/${total}`);
+          if (total > 1)
+            void editStatus(ctx, status, `⏳ Собираю статью… ${done}/${total}`);
         },
       });
       llmMs = Date.now() - tLlm;
@@ -61,8 +64,15 @@ export async function onArticle(ctx: Context): Promise<void> {
       : '';
 
     await ctx.replyWithDocument(
-      new InputFile(Buffer.from(result.markdown, 'utf8'), articleFilename(extracted?.title)),
-      { caption: caption + notice, parse_mode: 'HTML', ...replyTo(ctx.message?.message_id) },
+      new InputFile(
+        Buffer.from(result.markdown, 'utf8'),
+        articleFilename(extracted?.title),
+      ),
+      {
+        caption: caption + notice,
+        parse_mode: 'HTML',
+        ...replyTo(ctx.message?.message_id),
+      },
     );
 
     logger.info(
@@ -100,7 +110,9 @@ export async function onArticle(ctx: Context): Promise<void> {
     );
   } finally {
     clearInterval(typing);
-    await ctx.api.deleteMessage(status.chat.id, status.message_id).catch(() => {});
+    await ctx.api
+      .deleteMessage(status.chat.id, status.message_id)
+      .catch(() => {});
   }
 }
 
@@ -110,7 +122,9 @@ async function editStatus(
   status: { chat: { id: number }; message_id: number },
   text: string,
 ): Promise<void> {
-  await ctx.api.editMessageText(status.chat.id, status.message_id, text).catch(() => {});
+  await ctx.api
+    .editMessageText(status.chat.id, status.message_id, text)
+    .catch(() => {});
 }
 
 /** Короткий машиночитаемый код причины для метрик. */

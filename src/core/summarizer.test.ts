@@ -31,7 +31,10 @@ test('capTokens: длинный текст обрезается, считает�
   const r = capTokens(text, 100);
   assert.equal(r.truncated, true);
   assert.ok(r.text.length < text.length, 'текст реально укоротился');
-  assert.ok(r.keptPercent > 0 && r.keptPercent < 100, `keptPercent в (0,100): ${r.keptPercent}`);
+  assert.ok(
+    r.keptPercent > 0 && r.keptPercent < 100,
+    `keptPercent в (0,100): ${r.keptPercent}`,
+  );
 });
 
 const source = (chars: number): string => 'а'.repeat(chars);
@@ -39,7 +42,10 @@ const source = (chars: number): string => 'а'.repeat(chars);
 test('summaryBudget: объём растёт вместе с источником — это суть фичи', () => {
   const short = summaryBudget(source(3_000));
   const long = summaryBudget(source(60_000));
-  assert.ok(long.chars > short.chars * 2, `часовое видео должно быть заметно длиннее: ${short.chars} → ${long.chars}`);
+  assert.ok(
+    long.chars > short.chars * 2,
+    `часовое видео должно быть заметно длиннее: ${short.chars} → ${long.chars}`,
+  );
   assert.ok(long.blocks > short.blocks, 'и блоков должно стать больше');
 });
 
@@ -47,15 +53,23 @@ test('summaryBudget: рост сублинейный — длинное виде
   const a = summaryBudget(source(20_000));
   const b = summaryBudget(source(200_000));
   // Вход вырос в 10 раз, пересказ — меньше чем в 10 (иначе получим полотно).
-  assert.ok(b.chars < a.chars * 10, `рост должен быть медленнее линейного: ${a.chars} → ${b.chars}`);
+  assert.ok(
+    b.chars < a.chars * 10,
+    `рост должен быть медленнее линейного: ${a.chars} → ${b.chars}`,
+  );
 });
 
 test('summaryBudget: монотонность — больше вход, не меньше бюджет', () => {
-  const sizes = [0, 500, 1_500, 3_000, 10_000, 20_000, 60_000, 200_000, 1_000_000];
+  const sizes = [
+    0, 500, 1_500, 3_000, 10_000, 20_000, 60_000, 200_000, 1_000_000,
+  ];
   let prev = -1;
   for (const size of sizes) {
     const { chars } = summaryBudget(source(size));
-    assert.ok(chars >= prev, `бюджет не должен падать на ${size}: ${prev} → ${chars}`);
+    assert.ok(
+      chars >= prev,
+      `бюджет не должен падать на ${size}: ${prev} → ${chars}`,
+    );
     prev = chars;
   }
 });
@@ -68,7 +82,10 @@ test('summaryBudget: короткий текст — без блоков, свя
 test('summaryBudget: блоков либо ноль, либо хотя бы два — один блок бессмыслен', () => {
   for (const size of [0, 500, 2_400, 2_600, 3_000, 10_000]) {
     const { blocks } = summaryBudget(source(size));
-    assert.ok(blocks === 0 || blocks >= 2, `${size} символов → ${blocks} блоков`);
+    assert.ok(
+      blocks === 0 || blocks >= 2,
+      `${size} символов → ${blocks} блоков`,
+    );
   }
 });
 

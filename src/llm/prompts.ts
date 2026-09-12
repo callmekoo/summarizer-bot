@@ -103,7 +103,11 @@ ${lang}`;
  * Читается один раз при старте — чтобы применить правку файла, перезапусти процесс
  * (`docker compose restart bot`), пересборка образа не нужна.
  */
-function loadTaskPrompt(file: string | undefined, fallback: string, label: string): string {
+function loadTaskPrompt(
+  file: string | undefined,
+  fallback: string,
+  label: string,
+): string {
   if (!file) return fallback;
   try {
     const content = readFileSync(file, 'utf8').trim();
@@ -113,7 +117,10 @@ function loadTaskPrompt(file: string | undefined, fallback: string, label: strin
     }
     logger.warn({ file, label }, 'файл промпта пуст — использую встроенный');
   } catch (err) {
-    logger.warn({ err, file, label }, 'не удалось прочитать файл промпта — использую встроенный');
+    logger.warn(
+      { err, file, label },
+      'не удалось прочитать файл промпта — использую встроенный',
+    );
   }
   return fallback;
 }
@@ -206,7 +213,10 @@ export interface ArticleChunkContext {
 }
 
 /** Пользовательское сообщение для одного куска расшифровки. */
-export function articleUserPrompt(text: string, ctx: ArticleChunkContext): string {
+export function articleUserPrompt(
+  text: string,
+  ctx: ArticleChunkContext,
+): string {
   const position =
     ctx.total > 1
       ? `Это фрагмент ${ctx.index} из ${ctx.total} расшифровки одного видео. Продолжай статью с того места, где кончился предыдущий фрагмент: без вступлений, без повторов уже сказанного и без итоговых выводов — общее начало и конец соберутся из других фрагментов.`

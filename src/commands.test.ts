@@ -9,15 +9,25 @@ import { COMMANDS, renderHelp } from './commands.js';
 test('имена команд валидны для Telegram', () => {
   // Требование Bot API: только [a-z0-9_], 1-32 символа. Иначе setMyCommands упадёт целиком.
   for (const c of COMMANDS) {
-    assert.match(c.command, /^[a-z0-9_]{1,32}$/, `имя «${c.command}» не пройдёт setMyCommands`);
+    assert.match(
+      c.command,
+      /^[a-z0-9_]{1,32}$/,
+      `имя «${c.command}» не пройдёт setMyCommands`,
+    );
   }
 });
 
 test('описания непустые и влезают в лимит меню', () => {
   for (const c of COMMANDS) {
     assert.ok(c.description.length > 0, `у /${c.command} пустое описание`);
-    assert.ok(c.description.length <= 256, `описание /${c.command} длиннее 256 символов`);
-    assert.ok(c.details === undefined || c.details.length > 0, `у /${c.command} пустой details`);
+    assert.ok(
+      c.description.length <= 256,
+      `описание /${c.command} длиннее 256 символов`,
+    );
+    assert.ok(
+      c.details === undefined || c.details.length > 0,
+      `у /${c.command} пустой details`,
+    );
   }
 });
 
@@ -31,7 +41,9 @@ test('реестр совпадает с регистрациями в bot.ts', 
   // bot.ts в юнит-тесте не импортируешь — на верхнем уровне он поднимает polling, поэтому
   // сверяемся по исходнику. Тест ломается, если добавить bot.command() мимо commands.ts.
   const source = readFileSync(new URL('./bot.ts', import.meta.url), 'utf8');
-  const registered = [...source.matchAll(/bot\.command\('([a-z0-9_]+)'/g)].map((m) => m[1]);
+  const registered = [...source.matchAll(/bot\.command\('([a-z0-9_]+)'/g)].map(
+    (m) => m[1],
+  );
 
   assert.deepEqual(
     [...registered].sort(),
@@ -44,7 +56,10 @@ test('renderHelp упоминает каждую команду и её опис
   const help = renderHelp();
   for (const c of COMMANDS) {
     assert.ok(help.includes(`/${c.command}`), `в справке нет /${c.command}`);
-    assert.ok(help.includes(c.description), `в справке нет описания /${c.command}`);
+    assert.ok(
+      help.includes(c.description),
+      `в справке нет описания /${c.command}`,
+    );
   }
 });
 

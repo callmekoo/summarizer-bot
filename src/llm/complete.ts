@@ -5,7 +5,10 @@ import { logger } from '../lib/logger.js';
 export type SummarizeErrorKind = 'unavailable' | 'rate_limited' | 'failed';
 
 export class SummarizeError extends Error {
-  constructor(public readonly kind: SummarizeErrorKind, message: string) {
+  constructor(
+    public readonly kind: SummarizeErrorKind,
+    message: string,
+  ) {
     super(message);
     this.name = 'SummarizeError';
   }
@@ -39,8 +42,12 @@ const MAX_RETRY_WAIT_MS = 30_000;
  * Общий низкий уровень для пересказа и сборки статьи: логика фолбэков и 429 тонкая,
  * дублировать её нельзя.
  */
-export async function complete(messages: ChatMessage[]): Promise<CompletionResult> {
-  const models = [config.MODEL, config.MODEL_FALLBACK].filter((m): m is string => Boolean(m));
+export async function complete(
+  messages: ChatMessage[],
+): Promise<CompletionResult> {
+  const models = [config.MODEL, config.MODEL_FALLBACK].filter(
+    (m): m is string => Boolean(m),
+  );
 
   for (let attempt = 0; ; attempt++) {
     let lastErr: unknown;
@@ -73,7 +80,10 @@ export async function complete(messages: ChatMessage[]): Promise<CompletionResul
         } else {
           nOther++;
         }
-        logger.warn({ err, model }, 'ошибка запроса к модели, пробую следующую');
+        logger.warn(
+          { err, model },
+          'ошибка запроса к модели, пробую следующую',
+        );
       }
     }
 
@@ -86,7 +96,10 @@ export async function complete(messages: ChatMessage[]): Promise<CompletionResul
       continue;
     }
     if (allRateLimited) {
-      throw new SummarizeError('rate_limited', `все модели перегружены (429): ${models.join(', ')}`);
+      throw new SummarizeError(
+        'rate_limited',
+        `все модели перегружены (429): ${models.join(', ')}`,
+      );
     }
 
     // Только 404 — слаги протухли/стали платными, это правка .env, а не временный сбой.
@@ -101,12 +114,20 @@ export async function complete(messages: ChatMessage[]): Promise<CompletionResul
 }
 
 function httpStatus(err: unknown): number | undefined {
-  return typeof err === 'object' && err !== null ? (err as { status?: number }).status : undefined;
+  return typeof err === 'object' && err !== null
+    ? (err as { status?: number }).status
+    : undefined;
 }
 
 /** Приводит usage из ответа провайдера к нашему виду (поля могут отсутствовать). */
 function mapUsage(
-  usage: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } | undefined,
+  usage:
+    | {
+        prompt_tokens?: number;
+        completion_tokens?: number;
+        total_tokens?: number;
+      }
+    | undefined,
 ): TokenUsage | undefined {
   if (!usage) return undefined;
   return {

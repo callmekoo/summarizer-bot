@@ -31,5 +31,8 @@ test('extractUrl игнорирует не-http схемы', () => {
 });
 
 test('extractUrl не захватывает закрывающую скобку', () => {
-  assert.equal(extractUrl('ссылка (https://example.com/page) тут'), 'https://example.com/page');
+  assert.equal(
+    extractUrl('ссылка (https://example.com/page) тут'),
+    'https://example.com/page',
+  );
 });

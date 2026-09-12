@@ -4,7 +4,9 @@ import { chunkTranscript, stripAdChapters, isAdChapter } from './chunker.js';
 import type { Chapter, TranscriptSegment } from '../types.js';
 
 /** Сегменты с уникальными текстами s0, s1… — так легко проверить порядок и полноту. */
-function segments(specs: { chapter: number; len?: number }[]): TranscriptSegment[] {
+function segments(
+  specs: { chapter: number; len?: number }[],
+): TranscriptSegment[] {
   return specs.map((spec, i) => ({
     // Текст вида "s0aaaa…" нужной длины: уникальный префикс + набивка.
     text: `s${i}`.padEnd(spec.len ?? 2, 'a'),
@@ -50,24 +52,39 @@ test('соседние главы пакуются в один кусок, по�
 
 test('глава больше бюджета режется по границам сегментов, бюджет соблюдён', () => {
   // Одна глава из 5 сегментов по 100 символов = 500; бюджет 250.
-  const t = segments(Array.from({ length: 5 }, () => ({ chapter: 0, len: 100 })));
+  const t = segments(
+    Array.from({ length: 5 }, () => ({ chapter: 0, len: 100 })),
+  );
   const chunks = chunkTranscript(t, chapters, 250);
   assert.ok(chunks.length > 1, 'глава разрезана');
   for (const c of chunks) {
-    assert.ok(c.text.length <= 250, `кусок в пределах бюджета: ${c.text.length}`);
-    assert.deepEqual(c.chapterTitles, ['Вступление'], 'части наследуют заголовок главы');
+    assert.ok(
+      c.text.length <= 250,
+      `кусок в пределах бюджета: ${c.text.length}`,
+    );
+    assert.deepEqual(
+      c.chapterTitles,
+      ['Вступление'],
+      'части наследуют заголовок главы',
+    );
   }
 });
 
 test('глав нет → сегменты просто пакуются по бюджету, заголовков нет', () => {
-  const t = segments(Array.from({ length: 4 }, () => ({ chapter: 0, len: 100 })));
+  const t = segments(
+    Array.from({ length: 4 }, () => ({ chapter: 0, len: 100 })),
+  );
   const chunks = chunkTranscript(t, undefined, 250);
   assert.ok(chunks.length > 1, 'нарезано по бюджету');
-  for (const c of chunks) assert.deepEqual(c.chapterTitles, [], 'заголовков нет — придумает модель');
+  for (const c of chunks)
+    assert.deepEqual(c.chapterTitles, [], 'заголовков нет — придумает модель');
 });
 
 test('ИНВАРИАНТ: ни один сегмент не потерян и порядок сохранён', () => {
-  const specs = Array.from({ length: 40 }, (_, i) => ({ chapter: i % 3, len: 60 }));
+  const specs = Array.from({ length: 40 }, (_, i) => ({
+    chapter: i % 3,
+    len: 60,
+  }));
   const t = segments(specs);
   const chunks = chunkTranscript(t, chapters, 200);
 
@@ -93,14 +110,28 @@ test('нулевой бюджет — это ошибка конфигураци
 });
 
 test('isAdChapter: ловит самостоятельные рекламные названия', () => {
-  for (const t of ['Реклама', 'реклама', '⚡ Реклама!', 'Спонсор', 'Спонсоры', 'Промо', 'Ad break', 'SPONSOR']) {
+  for (const t of [
+    'Реклама',
+    'реклама',
+    '⚡ Реклама!',
+    'Спонсор',
+    'Спонсоры',
+    'Промо',
+    'Ad break',
+    'SPONSOR',
+  ]) {
     assert.ok(isAdChapter(t), `реклама: ${t}`);
   }
 });
 
 test('isAdChapter: НЕ трогает содержательные главы, где реклама — тема', () => {
   // Иначе выкинем кусок видео, который как раз про рекламу.
-  for (const t of ['Реклама в играх', 'Как работает реклама', 'Спонсорство в киберспорте', 'Реклама и этика']) {
+  for (const t of [
+    'Реклама в играх',
+    'Как работает реклама',
+    'Спонсорство в киберспорте',
+    'Реклама и этика',
+  ]) {
     assert.ok(!isAdChapter(t), `не реклама: ${t}`);
   }
 });
@@ -112,11 +143,20 @@ test('stripAdChapters: сегменты рекламной главы выбро
     { title: 'Реклама', startTime: 10 },
     { title: 'Итоги', startTime: 20 },
   ];
-  const t = segments([{ chapter: 0 }, { chapter: 1 }, { chapter: 1 }, { chapter: 2 }]);
+  const t = segments([
+    { chapter: 0 },
+    { chapter: 1 },
+    { chapter: 1 },
+    { chapter: 2 },
+  ]);
 
   const kept = stripAdChapters(t, withAd);
   assert.equal(kept.length, 2, 'два рекламных сегмента выброшены');
-  assert.deepEqual(kept.map((s) => s.chapterIndex), [0, 2], 'осталось содержание');
+  assert.deepEqual(
+    kept.map((s) => s.chapterIndex),
+    [0, 2],
+    'осталось содержание',
+  );
 });
 
 test('stripAdChapters: заголовок «Реклама» не доедет до модели как заголовок раздела', () => {
@@ -128,7 +168,11 @@ test('stripAdChapters: заголовок «Реклама» не доедет �
 
   const chunks = chunkTranscript(stripAdChapters(t, withAd), withAd, 10_000);
   const titles = chunks.flatMap((c) => c.chapterTitles);
-  assert.deepEqual(titles, ['Вступление'], 'рекламной главы среди заголовков нет');
+  assert.deepEqual(
+    titles,
+    ['Вступление'],
+    'рекламной главы среди заголовков нет',
+  );
 });
 
 test('stripAdChapters: нет глав или нет рекламы → транскрипт не трогаем', () => {

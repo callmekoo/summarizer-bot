@@ -5,7 +5,10 @@ import { createRateLimiter } from '../lib/rateLimiter.js';
 // Не более RATE_LIMIT_PER_MIN сообщений в минуту на пользователя.
 const limiter = createRateLimiter(config.RATE_LIMIT_PER_MIN, 60_000);
 
-export async function rateLimit(ctx: Context, next: NextFunction): Promise<void> {
+export async function rateLimit(
+  ctx: Context,
+  next: NextFunction,
+): Promise<void> {
   const id = ctx.from?.id;
   if (id === undefined) {
     return next();

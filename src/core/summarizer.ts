@@ -1,4 +1,8 @@
-import { SYSTEM_PROMPT, userPrompt, type SummaryBudget } from '../llm/prompts.js';
+import {
+  SYSTEM_PROMPT,
+  userPrompt,
+  type SummaryBudget,
+} from '../llm/prompts.js';
 import { complete } from '../llm/complete.js';
 import { config } from '../config.js';
 import { logger } from '../lib/logger.js';
@@ -25,7 +29,10 @@ export interface SummarizeResult {
  * Суммаризирует текст одним проходом (без map-reduce — пока хватает обрезки по
  * MAX_INPUT_TOKENS). Перебор моделей, 404/429 и повторы — в `complete`.
  */
-export async function summarize(text: string, title?: string): Promise<SummarizeResult> {
+export async function summarize(
+  text: string,
+  title?: string,
+): Promise<SummarizeResult> {
   const cap = capTokens(text, config.MAX_INPUT_TOKENS);
   // Бюджет считаем от обрезанного текста: ориентир должен отражать то, что модель видит.
   const budget = summaryBudget(cap.text);
@@ -66,7 +73,9 @@ export function summaryBudget(text: string): SummaryBudget {
   // Круглое число: «около 1700» читается моделью как ориентир, «около 1697» — как точная цель.
   const chars = Math.round(raw / 100) * 100;
   const blocks =
-    chars < BLOCKS_THRESHOLD ? 0 : clamp(Math.round(chars / CHARS_PER_BLOCK), 2, MAX_BLOCKS);
+    chars < BLOCKS_THRESHOLD
+      ? 0
+      : clamp(Math.round(chars / CHARS_PER_BLOCK), 2, MAX_BLOCKS);
   return { chars, blocks };
 }
 
@@ -97,7 +106,10 @@ export function capTokens(text: string, maxTokens: number): CapResult {
     return { text, truncated: false, keptPercent: 100 };
   }
   const ratio = maxTokens / tokenCount;
-  logger.warn({ tokenCount, maxTokens }, 'текст превышает лимит токенов (оценка), обрезаю');
+  logger.warn(
+    { tokenCount, maxTokens },
+    'текст превышает лимит токенов (оценка), обрезаю',
+  );
   return {
     text: text.slice(0, Math.floor(text.length * ratio)),
     truncated: true,

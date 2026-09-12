@@ -54,6 +54,8 @@ npm run dev            # режим разработки (tsx watch)
 ```sh
 npm test           # юнит-тесты (node:test через tsx)
 npm run typecheck  # проверка типов
+npm run format     # форматирование prettier
+npm run check      # typecheck + тесты + проверка форматирования
 npm run build
 npm start
 ```
