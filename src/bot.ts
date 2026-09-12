@@ -20,21 +20,19 @@ if (config.ALLOWED_USER_IDS.length === 0) {
 
 bot.use(allowlist);
 bot.use(rateLimit);
-// Имена и описания команд — в commands.ts (там же берёт их меню Telegram и /help).
-// Команды разбираются до общего обработчика текста, иначе `/article <url>` уйдёт в пересказ.
+// До общего обработчика текста, иначе `/article <url>` уйдёт в пересказ.
 bot.command('summary', onLink);
 bot.command('article', onArticle);
 bot.command('help', onHelp);
 bot.command('start', onStart);
-// Ссылка без команды = пересказ: extractUrl вытащит её из любого текста.
+// Ссылка без команды — тоже пересказ.
 bot.on('message:text', onLink);
 
 bot.catch((err) => {
   logger.error({ err: err.error }, 'необработанная ошибка бота');
 });
 
-// Heartbeat для Docker healthcheck: обновляем mtime файла, пока бот реально опрашивает
-// Telegram. Если polling умрёт — файл «протухнет» и контейнер пометится unhealthy.
+// Docker healthcheck: файл «протух» дольше 60 с — контейнер unhealthy.
 const HEARTBEAT_INTERVAL_MS = 15_000;
 
 function writeHeartbeat(): void {
@@ -45,25 +43,44 @@ function writeHeartbeat(): void {
   }
 }
 
+// isRunning() true ещё до успешного getMe, isInited() — только после.
 const heartbeat = setInterval(() => {
-  if (bot.isRunning()) writeHeartbeat();
+  if (bot.isInited() && bot.isRunning()) writeHeartbeat();
 }, HEARTBEAT_INTERVAL_MS);
 
+// После stop() event loop держат keep-alive сокеты grammY, сам процесс не выйдет.
+const SHUTDOWN_TIMEOUT_MS = 5_000;
+
+let stopping = false;
+
 const shutdown = (): void => {
+  stopping = true;
   clearInterval(heartbeat);
-  void bot.stop();
+  setTimeout(() => process.exit(process.exitCode ?? 0), SHUTDOWN_TIMEOUT_MS).unref();
+  bot.stop().catch((err: unknown) => logger.warn({ err }, 'остановка поллинга с ошибкой'));
 };
 process.once('SIGINT', shutdown);
 process.once('SIGTERM', shutdown);
 
-bot.start({
-  onStart: (me) => {
-    writeHeartbeat();
-    // Меню у поля ввода: без регистрации набор «/» не подсказывает ничего. Вызов сетевой,
-    // но бот без меню вполне работоспособен — падать из-за него не за что, только warn.
-    void bot.api
-      .setMyCommands(COMMANDS.map(({ command, description }) => ({ command, description })))
-      .catch((err: unknown) => logger.warn({ err }, 'не удалось зарегистрировать меню команд'));
-    logger.info({ username: me.username }, 'бот запущен');
-  },
-});
+bot
+  .start({
+    onStart: (me) => {
+      writeHeartbeat();
+      // Меню у поля ввода. Сетевой вызов, но без меню бот работоспособен — только warn.
+      void bot.api
+        .setMyCommands(COMMANDS.map(({ command, description }) => ({ command, description })))
+        .catch((err: unknown) => logger.warn({ err }, 'не удалось зарегистрировать меню команд'));
+      logger.info({ username: me.username }, 'бот запущен');
+    },
+  })
+  // start() реджектится и при штатной остановке, и при отказе поллинга (401, 409).
+  .catch((err: unknown) => {
+    clearInterval(heartbeat);
+    if (stopping) {
+      logger.info('поллинг остановлен');
+      return;
+    }
+    logger.fatal({ err }, 'поллинг остановлен из-за ошибки');
+    process.exitCode = 1;
+    setTimeout(() => process.exit(1), SHUTDOWN_TIMEOUT_MS).unref();
+  });

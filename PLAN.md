@@ -189,7 +189,11 @@ src/
 - [x] Метрики: одна строка-лог `request` на запрос (`ok`, `model`, `parseMs`, `llmMs`,
   `totalMs`, `promptTokens`/`completionTokens`, `queuedAhead`, `reason` при ошибке)
 - [x] Healthcheck (heartbeat-файл): бот обновляет `HEARTBEAT_FILE`, пока опрашивает
-  Telegram; `HEALTHCHECK` в Dockerfile считает unhealthy при «протухании» > 60 с
+  Telegram; `HEALTHCHECK` в Dockerfile считает unhealthy при «протухании» > 60 с.
+  Пишется только после успешной инициализации (`isInited`) — иначе бот, застрявший в
+  ретраях `getMe`, выглядел бы здоровым
+- [x] Остановка: реджект `bot.start()` (штатный abort, а также 401/409) обрабатывается,
+  а не роняет процесс необработанным промисом; выход не дольше 5 с
 - [ ] Polling для старта; webhook — когда понадобится масштаб
 - [ ] **При добавлении webhook — переделать healthcheck на HTTP `/health`** (вебхук и так
   поднимает HTTP-сервер; heartbeat-файл тогда убрать)
