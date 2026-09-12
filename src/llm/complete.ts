@@ -117,15 +117,28 @@ function mapUsage(
 }
 
 /** Достаёт паузу до повтора из 429: сперва metadata, потом заголовок Retry-After. */
-function retryAfterMs(err: unknown): number {
+export function retryAfterMs(err: unknown): number {
   const e = err as {
-    headers?: Record<string, string>;
+    headers?: Headers | Record<string, string>;
     error?: { metadata?: { retry_after_seconds?: number } };
   };
   const metaSec = e?.error?.metadata?.retry_after_seconds;
-  const headerSec = Number(e?.headers?.['retry-after']);
+  const headerSec = Number(header(e?.headers, 'retry-after'));
   const sec = Number.isFinite(metaSec) ? Number(metaSec) : headerSec;
   return Number.isFinite(sec) && sec > 0 ? sec * 1000 : 5000;
+}
+
+// openai с v5 отдаёт заголовки ошибки нативным Headers (раньше — обычным объектом),
+// а провайдеры/моки могут прислать и то, и другое. Читаем обе формы.
+function header(
+  headers: Headers | Record<string, string> | undefined,
+  name: string,
+): string | undefined {
+  if (!headers) return undefined;
+  if (typeof (headers as Headers).get === 'function') {
+    return (headers as Headers).get(name) ?? undefined;
+  }
+  return (headers as Record<string, string>)[name];
 }
 
 function sleep(ms: number): Promise<void> {

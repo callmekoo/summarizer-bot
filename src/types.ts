@@ -19,7 +19,7 @@ export interface ExtractResult {
   /** Имя сайта или домен (siteName ?? domain). */
   site?: string;
   wordCount?: number;
-  /** Тип контента по версии rdrr: youtube, webpage, github, pdf, x-profile, x-status. */
+  /** Тип контента по версии rdrr: youtube, webpage, github, stackoverflow, x-profile, x-status. */
   type?: string;
   url: string;
   /** Только для type === 'youtube'. Может быть пустым: главы есть не у всех видео. */

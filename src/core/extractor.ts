@@ -12,8 +12,9 @@ export class ExtractError extends Error {
 
 const TIMEOUT_MS = 60_000;
 
-// rdrr — ESM-библиотека без публичных типов, поэтому грузим динамически и
-// нормализуем форму ответа (markdown может лежать по-разному).
+// rdrr грузим динамически: типы у него появились только в 0.7, а форму ответа мы
+// всё равно нормализуем сами (markdown может лежать по-разному, поля — уезжать между
+// минорными версиями: она pre-1.0 и ломает совместимость на 0.x).
 type ParseFn = (url: string, options?: Record<string, unknown>) => Promise<any>;
 let parseFn: ParseFn | null = null;
 

@@ -24,7 +24,7 @@ npm run dev
 
 ## Стек
 
-- **TypeScript / Node.js 20+**, ESM (`"type": "module"`, `module: NodeNext`).
+- **TypeScript / Node.js 22.12+**, ESM (`"type": "module"`, `module: NodeNext`).
 - **grammY** — телеграм-бот. **rdrr** — извлечение текста (как библиотека).
 - **LLM** — любой OpenAI-совместимый API через `openai` SDK; провайдер задаётся
   `LLM_BASE_URL` + `LLM_API_KEY` (дефолт — OpenRouter).
@@ -90,7 +90,7 @@ src/
 - **ESM-импорты с расширением `.js`** (требование NodeNext), даже для `.ts`-файлов.
 - **rdrr**: текст лежит в поле `content` (не `markdown`); `title`/`wordCount`/`type` —
   на верхнем уровне `ParseResult`. Грузим динамически (`await import('rdrr')`).
-- **rdrr и видео**: `type` бывает `youtube | webpage | github | pdf | x-profile | x-status`.
+- **rdrr и видео**: `type` бывает `youtube | webpage | github | stackoverflow | x-profile | x-status`.
   **Видео — только YouTube**, Vimeo и прочих нет. У youtube есть `chapters[]` и `transcript[]`
   (у сегмента — `chapterIndex`), а `content` — плоский дамп с таймкодами, для статьи не годится:
   строим из `transcript[]`. Для webpage `content` — **голое тело без H1**, шапку добавляем сами.

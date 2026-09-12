@@ -6,13 +6,13 @@ const allowedUserIds = z
   .string()
   .default('')
   .transform((s) => s.split(',').map((x) => x.trim()).filter(Boolean))
-  .pipe(z.array(z.coerce.number().int().positive()));
+  .pipe(z.array(z.coerce.number<string>().int().positive()));
 
 const schema = z.object({
   BOT_TOKEN: z.string().min(1, 'BOT_TOKEN обязателен'),
   // Любой OpenAI-совместимый провайдер. По умолчанию — OpenRouter.
   LLM_API_KEY: z.string().min(1, 'LLM_API_KEY (или OPENROUTER_API_KEY) обязателен'),
-  LLM_BASE_URL: z.string().url().default('https://openrouter.ai/api/v1'),
+  LLM_BASE_URL: z.url().default('https://openrouter.ai/api/v1'),
   // Слаги моделей у провайдера. MODEL обязателен; MODEL_FALLBACK опционален
   // (пробуется при ошибке/429 основной). Дефолтов нет — выбираются под провайдера.
   MODEL: z.string().min(1, 'MODEL обязателен (укажи slug модели)'),

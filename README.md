@@ -31,7 +31,7 @@ Telegram (регистрируется при старте через `setMyComm
 
 ## Стек
 
-TypeScript (Node 20+) · grammY · rdrr · OpenAI-совместимый LLM API (через `openai` SDK).
+TypeScript (Node 22.12+) · grammY · rdrr · OpenAI-совместимый LLM API (через `openai` SDK).
 
 ## Запуск
 
@@ -40,6 +40,11 @@ npm install
 cp .env.example .env   # заполнить BOT_TOKEN и OPENROUTER_API_KEY
 npm run dev            # режим разработки (tsx watch)
 ```
+
+> Если локально ходишь в интернет через прокси: Node (в отличие от `curl`) переменные
+> `HTTPS_PROXY`/`ALL_PROXY` сам не читает, запросы к Telegram и LLM пойдут напрямую и
+> упрутся в фильтр. Запускай с `NODE_USE_ENV_PROXY=1 npm run dev`. На сервере в Docker
+> это не нужно.
 
 Тесты и сборка:
 
@@ -158,7 +163,7 @@ curl -s https://openrouter.ai/api/v1/models | \
 — её сегменты выбрасываются **в коде**, ещё до модели: так надёжнее, и заодно её заголовок не
 уедет модели как основа для раздела статьи. Неразмеченные вставки ловит промпт.
 
-Ссылка **не на видео** (статья, GitHub, PDF) → отдаём текст страницы в `.md` сразу, без LLM:
+Ссылка **не на видео** (статья, GitHub, Stack Overflow) → отдаём текст страницы в `.md` сразу, без LLM:
 rdrr уже вернул структурированный markdown. *Видео rdrr понимает только с YouTube.*
 
 ### Почему расшифровка режется на куски
