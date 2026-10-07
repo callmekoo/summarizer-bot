@@ -36,3 +36,26 @@ test('extractUrl не захватывает закрывающую скобку
     'https://example.com/page',
   );
 });
+
+test('extractUrl превращает youtube.com/live/ID в watch?v=ID', () => {
+  const watch = 'https://www.youtube.com/watch?v=oSsqVq4bhd8';
+  assert.equal(extractUrl('https://www.youtube.com/live/oSsqVq4bhd8'), watch);
+  assert.equal(extractUrl('https://youtube.com/live/oSsqVq4bhd8?si=x1'), watch);
+  assert.equal(extractUrl('https://m.youtube.com/live/oSsqVq4bhd8/'), watch);
+});
+
+test('extractUrl не трогает обычные ссылки на YouTube и чужие /live/', () => {
+  assert.equal(
+    extractUrl('https://www.youtube.com/watch?v=oSsqVq4bhd8&t=42'),
+    'https://www.youtube.com/watch?v=oSsqVq4bhd8&t=42',
+  );
+  // Страница «эфиры канала», а не видео.
+  assert.equal(
+    extractUrl('https://www.youtube.com/@channel/live'),
+    'https://www.youtube.com/@channel/live',
+  );
+  assert.equal(
+    extractUrl('https://example.com/live/oSsqVq4bhd8'),
+    'https://example.com/live/oSsqVq4bhd8',
+  );
+});
