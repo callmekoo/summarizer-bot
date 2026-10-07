@@ -9,6 +9,7 @@
     "dev": "tsx watch src/bot.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "search:smoke": "tsx src/scripts/searchSmoke.ts",
     "start": "node dist/bot.js",
     "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "typecheck": "tsc --noEmit"

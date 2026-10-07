@@ -42,7 +42,8 @@ npm run typecheck  # tsc --noEmit (включая тесты)
 npm test           # node:test через tsx — юнит-тесты (src/**/*.test.ts)
 npm run format     # prettier --write . (конфиг — .prettierrc.json)
 npm run check      # typecheck + test + format:check (запускай перед коммитом)
-npm run build      # tsc -p tsconfig.build.json → dist/ (без *.test.ts)
+npm run build      # tsc -p tsconfig.build.json → dist/ (без *.test.ts и scripts/)
+npm run search:smoke -- "запрос"   # живой поиск YouTube без бота, LLM и .env
 npm start          # node dist/bot.js (прод)
 ```
 
@@ -56,6 +57,8 @@ config). Сетевые вызовы (rdrr, OpenRouter) в юнит-тестах
 Два пайплайна:
 
 - **Пересказ** (любой текст): `onLink` → `extract` → `summarize` → `formatter` → HTML в чат.
+- **Поиск** (`/search`): `onSearch` → `searchYoutube` → список + кнопки; нажатие →
+  `onSearchPick` → тот же `runSummary`, что у пересказа.
 - **Статья** (`/article`): `onArticle` → `extract` → `buildArticle` → `.md`-файлом.
   Видео → `chunker` → LLM по кускам последовательно → склейка. Не видео → markdown от rdrr
   под нашей шапкой, **без LLM**.
@@ -66,7 +69,8 @@ src/
                     регистрация меню команд (setMyCommands)
   config.ts         env + zod; падает с понятной ошибкой при невалидном .env
   commands.ts       реестр команд: имена, описания, renderHelp(). Хендлеров тут нет
-  handlers/         onStart, onHelp, onLink (/summary + текст), onArticle (/article)
+  handlers/         onStart, onHelp, onLink (/summary + текст, runSummary), onArticle
+                    (/article), onSearch (/search + нажатие кнопки)
   middleware/       allowlist (ALLOWED_USER_IDS), rateLimit (RATE_LIMIT_PER_MIN)
   core/
     extractor.ts    rdrr.parse(url) с таймаутом + 3 ретрая; ошибки → ExtractError(kind).
@@ -77,6 +81,8 @@ src/
                     (вырезает главы «Реклама»/«Спонсор» — см. подводные камни)
     article.ts      сборка статьи: чанки → LLM → markdown. LLM инжектится (тесты без сети)
     formatter.ts    escape HTML → **bold**→<b> → разбивка ≤4096; шапка источника
+    youtubeSearch.ts поиск через InnerTube, отсев эфиров/шортсов, список + кнопки.
+                    Без config/logger — тесты и smoke-скрипт работают без .env
   llm/
     client.ts       OpenAI-совместимый клиент
     complete.ts     ЕДИНСТВЕННОЕ место вызова LLM: перебор MODEL→MODEL_FALLBACK,
@@ -84,6 +90,7 @@ src/
     prompts.ts      SAFETY_RULES + промпты пересказа и статьи; wrapUntrusted (нонс-маркеры)
   lib/              url, logger, concurrency, rateLimiter, filename (slug для .md)
   types.ts          ExtractResult, Chapter, TranscriptSegment, isVideo()
+  scripts/          searchSmoke.ts — живая проверка поиска, в build не попадает
 ```
 
 ## Соглашения и подводные камни
@@ -152,6 +159,14 @@ src/
   общую константу `SOURCE_TAG` — не разъезжайся. Новый путь к LLM → обязательно через
   `wrapUntrusted` + `composeSystemPrompt`. Без действий/секретов в контексте инъекция максимум
   портит вывод: это снижение риска, не абсолют.
+- **Поиск `/search` — InnerTube, неофициальный.** Эфиры отсекаются консервативно: нет
+  длительности (`lengthText`) или есть любой признак эфира → видео не предлагаем. Записи
+  прошедших трансляций — обычные видео, проходят (так решил владелец). В `callback_data`
+  лежит сам id видео (`sum:<id>`): результаты не храним. Колбэк надо **сразу** подтвердить
+  `answerCallbackQuery`, иначе у кнопки крутится спиннер — это касается и отказа rate-limit.
+  Сломался поиск — сначала `npm run search:smoke`, сырой ответ `--save` → в фикстуру теста.
+- **Тесты, импортирующие `config`, без `.env` падают** (`chunker`, `allowlist`): в облачной
+  песочнице гоняй `BOT_TOKEN=x LLM_API_KEY=x MODEL=x npm run check`.
 - Ошибки наружу — понятным текстом пользователю, не стек-трейсом (см. `onLink`).
 - Провайдер настраивается (`LLM_BASE_URL`/`LLM_API_KEY`), всё ниже — **специфика
   дефолтного OpenRouter**; для OpenAI/Groq/Ollama просто поменяй baseURL+ключ+`MODEL`.
@@ -177,6 +192,9 @@ fallback-модель + повтор по 429, очередь `MAX_CONCURRENCY`,
 Команды бота подсказываются сами (Этап 6): реестр в `commands.ts` → меню Telegram
 (`setMyCommands`) + `/help`. Пересказ получил явное имя `/summary`, `/start` ужался до
 приветствия. Текст со ссылкой без команды по-прежнему идёт в пересказ.
+
+Готова команда **`/search`** (Этап 7): поиск на YouTube через InnerTube → 5 вариантов
+кнопками → пересказ. Осталось прогнать на живом YouTube (из облачной песочницы закрыт).
 
 Открыто (см. [PLAN.md](PLAN.md)):
 - **webhook** вместо polling — и тогда healthcheck переделать на HTTP `/health`;

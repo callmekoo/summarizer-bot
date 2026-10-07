@@ -6,6 +6,8 @@ import { onStart } from './handlers/onStart.js';
 import { onHelp } from './handlers/onHelp.js';
 import { onLink } from './handlers/onLink.js';
 import { onArticle } from './handlers/onArticle.js';
+import { onSearch, onSearchPick } from './handlers/onSearch.js';
+import { PICK_RE } from './core/youtubeSearch.js';
 import { COMMANDS } from './commands.js';
 import { allowlist } from './middleware/allowlist.js';
 import { rateLimit } from './middleware/rateLimit.js';
@@ -25,8 +27,11 @@ bot.use(rateLimit);
 // До общего обработчика текста, иначе `/article <url>` уйдёт в пересказ.
 bot.command('summary', onLink);
 bot.command('article', onArticle);
+bot.command('search', onSearch);
 bot.command('help', onHelp);
 bot.command('start', onStart);
+// Кнопка «пересказать» из списка /search.
+bot.callbackQuery(PICK_RE, onSearchPick);
 // Ссылка без команды — тоже пересказ.
 bot.on('message:text', onLink);
 
