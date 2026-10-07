@@ -28,7 +28,19 @@ export async function onLink(ctx: Context): Promise<void> {
     );
     return;
   }
+  await runSummary(ctx, url, ctx.message?.message_id);
+}
 
+/**
+ * Пересказ по готовой ссылке: извлечение → LLM → сообщения в чат + строка метрик.
+ * Общий путь для ссылки в сообщении и для кнопки из /search (там ctx.message нет —
+ * отвечаем на список результатов, его id передаёт вызывающий).
+ */
+export async function runSummary(
+  ctx: Context,
+  url: string,
+  replyToMessageId: number | undefined,
+): Promise<void> {
   const status = await ctx.reply('⏳ Обрабатываю ссылку…');
   // Держим индикатор «печатает», пока идёт парсинг + запрос к LLM.
   const typing = setInterval(() => {
@@ -68,7 +80,7 @@ export async function onLink(ctx: Context): Promise<void> {
 
     // Части выстраиваем цепочкой: первая отвечает на ссылку, каждая следующая — на
     // предыдущую. Так пересказ читается по порядку, даже если чат уехал далеко вперёд.
-    let replyToId = ctx.message?.message_id;
+    let replyToId = replyToMessageId;
     for (const chunk of splitForTelegram(message)) {
       const sent = await ctx.reply(chunk, {
         parse_mode: 'HTML',
@@ -99,7 +111,7 @@ export async function onLink(ctx: Context): Promise<void> {
       'request',
     );
   } catch (err) {
-    await ctx.reply(userMessageForError(err), replyTo(ctx.message?.message_id));
+    await ctx.reply(userMessageForError(err), replyTo(replyToMessageId));
     // Метрики: одна строка на неуспешный запрос (err тоже логируем для деталей).
     logger.error(
       {
