@@ -6,8 +6,8 @@ import { onStart } from './handlers/onStart.js';
 import { onHelp } from './handlers/onHelp.js';
 import { onLink } from './handlers/onLink.js';
 import { onArticle } from './handlers/onArticle.js';
-import { onSearch, onSearchPick } from './handlers/onSearch.js';
-import { PICK_RE } from './core/youtubeSearch.js';
+import { onSearch, onSearchCommand } from './handlers/onSearch.js';
+import { PICK_COMMAND_RE } from './core/youtubeSearch.js';
 import { COMMANDS } from './commands.js';
 import { allowlist } from './middleware/allowlist.js';
 import { rateLimit } from './middleware/rateLimit.js';
@@ -30,8 +30,9 @@ bot.command('article', onArticle);
 bot.command('search', onSearch);
 bot.command('help', onHelp);
 bot.command('start', onStart);
-// Кнопка «пересказать» из списка /search.
-bot.callbackQuery(PICK_RE, onSearchPick);
+// Команды `/sum_<id>` и `/art_<id>` из списка /search. Имена динамические, поэтому
+// hears, а не command; иначе их, как и прочий текст, съест onLink.
+bot.hears(PICK_COMMAND_RE, onSearchCommand);
 // Ссылка без команды — тоже пересказ.
 bot.on('message:text', onLink);
 

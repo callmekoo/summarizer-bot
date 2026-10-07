@@ -33,8 +33,8 @@ export async function onLink(ctx: Context): Promise<void> {
 
 /**
  * Пересказ по готовой ссылке: извлечение → LLM → сообщения в чат + строка метрик.
- * Общий путь для ссылки в сообщении и для кнопки из /search (там ctx.message нет —
- * отвечаем на список результатов, его id передаёт вызывающий).
+ * Общий путь для ссылки в сообщении и для команды `/sum_<id>` из списка /search;
+ * результат приходит ответом на replyToMessageId.
  */
 export async function runSummary(
   ctx: Context,

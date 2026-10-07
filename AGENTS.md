@@ -57,8 +57,8 @@ config). Сетевые вызовы (rdrr, OpenRouter) в юнит-тестах
 Два пайплайна:
 
 - **Пересказ** (любой текст): `onLink` → `extract` → `summarize` → `formatter` → HTML в чат.
-- **Поиск** (`/search`): `onSearch` → `searchYoutube` → список + кнопки; нажатие →
-  `onSearchPick` → тот же `runSummary`, что у пересказа.
+- **Поиск** (`/search`): `onSearch` → `searchYoutube` → список со ссылками и командами
+  `/sum_<id>` / `/art_<id>` → `onSearchCommand` → тот же `runSummary` / `runArticle`.
 - **Статья** (`/article`): `onArticle` → `extract` → `buildArticle` → `.md`-файлом.
   Видео → `chunker` → LLM по кускам последовательно → склейка. Не видео → markdown от rdrr
   под нашей шапкой, **без LLM**.
@@ -70,7 +70,7 @@ src/
   config.ts         env + zod; падает с понятной ошибкой при невалидном .env
   commands.ts       реестр команд: имена, описания, renderHelp(). Хендлеров тут нет
   handlers/         onStart, onHelp, onLink (/summary + текст, runSummary), onArticle
-                    (/article), onSearch (/search + нажатие кнопки)
+                    (/article, runArticle), onSearch (/search + команды /sum_ /art_)
   middleware/       allowlist (ALLOWED_USER_IDS), rateLimit (RATE_LIMIT_PER_MIN)
   core/
     extractor.ts    rdrr.parse(url) с таймаутом + 3 ретрая; ошибки → ExtractError(kind).
@@ -81,7 +81,7 @@ src/
                     (вырезает главы «Реклама»/«Спонсор» — см. подводные камни)
     article.ts      сборка статьи: чанки → LLM → markdown. LLM инжектится (тесты без сети)
     formatter.ts    escape HTML → **bold**→<b> → разбивка ≤4096; шапка источника
-    youtubeSearch.ts поиск через InnerTube, отсев эфиров/шортсов, список + кнопки.
+    youtubeSearch.ts поиск через InnerTube, отсев эфиров/шортсов, список + команды.
                     Без config/logger — тесты и smoke-скрипт работают без .env
   llm/
     client.ts       OpenAI-совместимый клиент
@@ -164,9 +164,14 @@ src/
   ослабляй правило про длительность:** на живой выдаче (smoke, «lofi hip hop radio») из 15
   отсеянных эфиров явную пометку несли только 5, остальные 10 пойманы лишь отсутствием
   `lengthText`. Записи
-  прошедших трансляций — обычные видео, проходят (так решил владелец). В `callback_data`
-  лежит сам id видео (`sum:<id>`): результаты не храним. Колбэк надо **сразу** подтвердить
-  `answerCallbackQuery`, иначе у кнопки крутится спиннер — это касается и отказа rate-limit.
+  прошедших трансляций — обычные видео, проходят (так решил владелец).
+- **Выбор в `/search` — командами, не кнопками** (так удобнее владельцу): под каждым видео
+  `/sum_<код>` и `/art_<код>`, по нажатию Telegram отправляет команду в чат. id видео зашит
+  в саму команду — результаты не храним. **id кодируется** (`encodeVideoId`: `_`→`_0`,
+  `-`→`_1`): Telegram подсвечивает команду только из `[A-Za-z0-9_]`, на `-` подсветка
+  обрывается. Ловится `bot.hears(PICK_COMMAND_RE)`, а не `bot.command` (имена динамические),
+  до `bot.on('message:text')`. В реестр `COMMANDS` эти команды не входят. В шапке списка
+  нет голых `/sum`: Telegram подсветит, а бот не поймёт.
   Сломался поиск — сначала `npm run search:smoke`, сырой ответ `--save` → в фикстуру теста.
 - **Тест модуля, который тянет `config` (напрямую или через `logger`)**, задаёт env в
   `before()` и импортирует модуль динамически (см. `summarizer.test.ts`): статический импорт
@@ -198,8 +203,8 @@ fallback-модель + повтор по 429, очередь `MAX_CONCURRENCY`,
 приветствия. Текст со ссылкой без команды по-прежнему идёт в пересказ.
 
 Готова команда **`/search`** (Этап 7): поиск на YouTube через InnerTube → 5 вариантов
-кнопками → пересказ. Поиск и фильтр эфиров проверены на живом YouTube (`search:smoke`);
-осталась ручная проверка в Telegram (кнопка → пересказ). Из облачной песочницы youtube.com
+со ссылками и командами `/sum_…` / `/art_…` → пересказ или статья. Поиск и фильтр эфиров
+проверены на живом YouTube (`search:smoke`); осталась ручная проверка команд в Telegram. Из облачной песочницы youtube.com
 закрыт — живой поиск гоняется локально.
 
 Открыто (см. [PLAN.md](PLAN.md)):

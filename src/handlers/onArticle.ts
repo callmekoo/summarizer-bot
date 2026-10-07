@@ -23,7 +23,18 @@ export async function onArticle(ctx: Context): Promise<void> {
     );
     return;
   }
+  await runArticle(ctx, url, ctx.message?.message_id);
+}
 
+/**
+ * Статья по готовой ссылке. Общий путь для /article и для команды `/art_<id>` из
+ * списка /search; результат приходит ответом на replyToMessageId.
+ */
+export async function runArticle(
+  ctx: Context,
+  url: string,
+  replyToMessageId: number | undefined,
+): Promise<void> {
   const status = await ctx.reply('⏳ Извлекаю текст…');
   const typing = setInterval(() => {
     ctx.replyWithChatAction('upload_document').catch(() => {});
@@ -71,7 +82,7 @@ export async function onArticle(ctx: Context): Promise<void> {
       {
         caption: caption + notice,
         parse_mode: 'HTML',
-        ...replyTo(ctx.message?.message_id),
+        ...replyTo(replyToMessageId),
       },
     );
 
@@ -93,7 +104,7 @@ export async function onArticle(ctx: Context): Promise<void> {
       'request',
     );
   } catch (err) {
-    await ctx.reply(userMessageForError(err), replyTo(ctx.message?.message_id));
+    await ctx.reply(userMessageForError(err), replyTo(replyToMessageId));
     logger.error(
       {
         err,

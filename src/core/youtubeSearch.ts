@@ -1,4 +1,3 @@
-import { InlineKeyboard } from 'grammy';
 import { escapeHtml } from './formatter.js';
 
 /**
@@ -60,10 +59,35 @@ export const SEARCH_LIMIT = 5;
 /** id видео YouTube — ровно 11 символов base64url. */
 export const VIDEO_ID_RE = /^[\w-]{11}$/;
 
-/** callback_data кнопок из renderSearchList. */
-export const PICK_PREFIX = 'sum:';
-/** Нажатие на кнопку из renderSearchList; группа 1 — id видео. */
-export const PICK_RE = /^sum:([\w-]{11})$/;
+/**
+ * Команды под вариантами списка: `/sum_<код>` — пересказ, `/art_<код>` — статья.
+ * Группа 1 — действие, группа 2 — закодированный id (см. encodeVideoId). Хвост
+ * `@botname` Telegram добавляет к командам в группах.
+ */
+export const PICK_COMMAND_RE = /^\/(sum|art)_([A-Za-z0-9_]+)(?:@\w+)?$/;
+export type PickAction = 'sum' | 'art';
+
+/**
+ * id видео → часть имени команды. Telegram подсвечивает команду только из
+ * `[A-Za-z0-9_]`, а в id бывает `-`: на нём подсветка оборвётся, и нажатие отправит
+ * обрубок. Кодируем обратимо: `_` → `_0`, `-` → `_1`.
+ */
+export function encodeVideoId(id: string): string {
+  return id.replace(/[_-]/g, (c) => (c === '_' ? '_0' : '_1'));
+}
+
+/** Обратно к id; `null`, если код испорчен или не похож на id видео. */
+export function decodeVideoId(code: string): string | null {
+  if (!/^(?:[A-Za-z0-9]|_[01])+$/.test(code)) return null;
+  const id = code.replace(/_([01])/g, (_, d: string) =>
+    d === '0' ? '_' : '-',
+  );
+  return VIDEO_ID_RE.test(id) ? id : null;
+}
+
+export function pickCommand(action: PickAction, id: string): string {
+  return `/${action}_${encodeVideoId(id)}`;
+}
 
 export function youtubeWatchUrl(id: string): string {
   return `https://www.youtube.com/watch?v=${id}`;
@@ -190,26 +214,25 @@ function collectVideoRenderers(root: unknown): Obj[] {
 }
 
 /**
- * Сообщение-список для /search и клавиатура «1…N». В callback_data — сам id видео
- * (`sum:<id>`, 15 байт при лимите 64): хранить результаты поиска не нужно, кнопки
- * работают и после рестарта бота.
+ * Сообщение-список для /search: название — ссылка на видео, под ним канал, длительность
+ * и две команды. id видео зашит в саму команду — хранить результаты поиска не нужно,
+ * команды работают и после рестарта бота.
  */
-export function renderSearchList(hits: VideoHit[]): {
-  text: string;
-  keyboard: InlineKeyboard;
-} {
-  const lines = hits.map((h, i) => {
+export function renderSearchList(hits: VideoHit[]): string {
+  const items = hits.map((h, i) => {
+    const href = escapeHtml(`https://youtu.be/${h.id}`).replace(/"/g, '&quot;');
     const meta = [h.channel, h.duration]
       .filter((s): s is string => Boolean(s))
-      .map(escapeHtml);
-    return `${i + 1}. <b>${escapeHtml(h.title)}</b>\n${meta.join(' · ')}`;
+      .map(escapeHtml)
+      .join(' · ');
+    const commands = `${pickCommand('sum', h.id)} · ${pickCommand('art', h.id)}`;
+    return `${i + 1}. <a href="${href}">${escapeHtml(h.title)}</a>\n${meta}\n${commands}`;
   });
-  const keyboard = new InlineKeyboard();
-  hits.forEach((h, i) => keyboard.text(String(i + 1), `${PICK_PREFIX}${h.id}`));
-  return {
-    text: ['Что пересказать?', ...lines].join('\n\n'),
-    keyboard,
-  };
+  // Без слэш-команд в шапке: голая «/sum» тоже подсветится, а по нажатию бот её не поймёт.
+  const head =
+    'Под каждым видео две команды: первая — пересказ в чат, вторая — статья .md-файлом. ' +
+    'Нажми нужную.';
+  return [head, ...items].join('\n\n');
 }
 
 type Obj = Record<string, unknown>;

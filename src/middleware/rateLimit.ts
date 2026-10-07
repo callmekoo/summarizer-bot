@@ -20,13 +20,5 @@ export async function rateLimit(
   }
 
   const sec = Math.ceil(retryAfterMs / 1000);
-  // Нажатие кнопки из /search: всплывашка вместо сообщения, и без ответа на callback
-  // у кнопки так и крутился бы спиннер.
-  if (ctx.callbackQuery) {
-    await ctx
-      .answerCallbackQuery({ text: `⏱ Слишком часто. Подожди ${sec} с.` })
-      .catch(() => {});
-    return;
-  }
   await ctx.reply(`⏱ Слишком часто. Подожди ${sec} с и пришли ссылку снова.`);
 }
