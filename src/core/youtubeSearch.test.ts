@@ -4,7 +4,10 @@ import {
   parseSearchResults,
   renderSearchList,
   youtubeWatchUrl,
-  PICK_RE,
+  PICK_COMMAND_RE,
+  encodeVideoId,
+  decodeVideoId,
+  pickCommand,
   type VideoHit,
 } from './youtubeSearch.js';
 
@@ -154,36 +157,83 @@ test('мусор на входе — пустой результат, без и�
   }
 });
 
-test('renderSearchList: нумерация, экранирование и кнопки с id видео', () => {
+test('кодирование id для команды обратимо и даёт только [A-Za-z0-9_]', () => {
+  for (const id of [
+    'oSsqVq4bhd8',
+    'a-b_c-d_e-f',
+    '___________',
+    '-----------',
+  ]) {
+    const code = encodeVideoId(id);
+    assert.match(code, /^[A-Za-z0-9_]+$/, `код «${code}» оборвёт подсветку`);
+    assert.equal(decodeVideoId(code), id);
+  }
+  assert.equal(encodeVideoId('ab_c-d'), 'ab_0c_1d');
+});
+
+test('decodeVideoId отвергает испорченный код', () => {
+  for (const bad of [
+    '',
+    'short',
+    'oSsqVq4bhd8x',
+    'abc_2defghij',
+    'oSsqVq4bhd_',
+    'ab-cdefghij',
+  ]) {
+    assert.equal(decodeVideoId(bad), null, `«${bad}» не должен декодироваться`);
+  }
+});
+
+test('PICK_COMMAND_RE ловит обе команды, в том числе с @botname', () => {
+  const id = 'a-b_cdefghi';
+  for (const action of ['sum', 'art'] as const) {
+    const cmd = pickCommand(action, id);
+    for (const text of [cmd, `${cmd}@summarizer_bot`]) {
+      const m = text.match(PICK_COMMAND_RE);
+      assert.equal(m?.[1], action);
+      assert.equal(decodeVideoId(m![2]!), id);
+    }
+  }
+  // Обычные команды бота сюда не попадают.
+  for (const text of [
+    '/summary https://x.y',
+    '/article',
+    '/search кот',
+    '/sum',
+  ]) {
+    assert.equal(PICK_COMMAND_RE.test(text), false, text);
+  }
+});
+
+test('renderSearchList: ссылка в названии, экранирование и обе команды', () => {
   const hits: VideoHit[] = [
     { id: 'aaaaaaaaaa1', title: 'C++ <templates> & co', duration: '9:59' },
     {
-      id: 'bbbbbbbbbb2',
+      id: 'bb-bbbbbb_2',
       title: 'Второе',
       channel: 'Канал <b>',
       duration: '1:02:03',
     },
   ];
-  const { text, keyboard } = renderSearchList(hits);
+  const text = renderSearchList(hits);
 
-  assert.match(text, /1\. <b>C\+\+ &lt;templates&gt; &amp; co<\/b>\n9:59/);
-  assert.match(text, /2\. <b>Второе<\/b>\nКанал &lt;b&gt; · 1:02:03/);
-
-  const buttons = keyboard.inline_keyboard.flat();
-  assert.deepEqual(
-    buttons.map((b) => b.text),
-    ['1', '2'],
+  assert.ok(
+    text.includes(
+      '1. <a href="https://youtu.be/aaaaaaaaaa1">C++ &lt;templates&gt; &amp; co</a>\n9:59\n' +
+        '/sum_aaaaaaaaaa1 · /art_aaaaaaaaaa1',
+    ),
+    text,
   );
-  const data = buttons.map((b) =>
-    'callback_data' in b ? b.callback_data : '',
+  assert.ok(
+    text.includes(
+      '2. <a href="https://youtu.be/bb-bbbbbb_2">Второе</a>\nКанал &lt;b&gt; · 1:02:03\n' +
+        '/sum_bb_1bbbbbb_02 · /art_bb_1bbbbbb_02',
+    ),
+    text,
   );
-  // Кнопка должна ловиться тем же регекспом, что регистрируется в bot.ts.
-  assert.deepEqual(
-    data.map((d) => d.match(PICK_RE)?.[1]),
-    ['aaaaaaaaaa1', 'bbbbbbbbbb2'],
-  );
-  // Лимит Telegram на callback_data — 64 байта.
-  for (const d of data) assert.ok(Buffer.byteLength(d) <= 64);
+  // В шапке нет голых слэш-команд: Telegram подсветил бы их, а бот не понял бы.
+  const head = text.split('\n\n')[0]!;
+  assert.doesNotMatch(head, /\/\w/);
 });
 
 test('youtubeWatchUrl строит каноническую ссылку', () => {
