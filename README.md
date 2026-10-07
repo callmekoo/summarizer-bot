@@ -255,22 +255,24 @@ src/
   bot.ts            точка входа (grammY, middleware, heartbeat, graceful shutdown)
   config.ts         env + валидация (zod)
   commands.ts       список команд: меню Telegram + текст /help
-  types.ts          ExtractResult
-  handlers/         хендлеры Telegram (onStart, onHelp, onLink, onArticle)
+  types.ts          ExtractResult и типы глав/транскрипта
+  handlers/         хендлеры Telegram (onStart, onHelp, onLink, onArticle, onSearch)
   middleware/       allowlist (Telegram ID), rateLimit (запросов/мин)
-  core/             extractor, summarizer, formatter
-  llm/              клиент OpenRouter + промпты
-  lib/              url, logger, concurrency, rateLimiter
+  core/             extractor, summarizer, chunker, article, formatter, youtubeSearch
+  llm/              клиент LLM, единая точка вызова (complete) + промпты
+  lib/              url, logger, redact, reply, filename, concurrency, rateLimiter
+  scripts/          searchSmoke — живая проверка /search (npm run search:smoke)
   **/*.test.ts      юнит-тесты рядом с кодом (node:test)
 
 Dockerfile · docker-compose.yml · .dockerignore   — деплой (см. выше)
-tsconfig.json / tsconfig.build.json                — типы / сборка (без тестов)
+tsconfig.json / tsconfig.build.json                — типы / сборка (без тестов и scripts/)
 ```
 
 ## Статус
 
-Рабочий бот, развёрнутый сценарий «ссылка → пересказ» полностью готов. Сделаны Этапы 1–3
-и бо́льшая часть Этапа 4 (Docker, compose, healthcheck, метрики). Что осталось — открытые
+Рабочий бот, развёрнутый сценарий «ссылка → пересказ» полностью готов. Сделаны Этапы 1–3,
+бо́льшая часть Этапа 4 (Docker, compose, healthcheck, метрики), статья `/article` (Этап 5),
+меню команд и `/help` (Этап 6) и поиск `/search` (Этап 7). Что осталось — открытые
 пункты в [PLAN.md](PLAN.md): **webhook** (и тогда `/health` вместо heartbeat) и
 опциональный **SQLite-кэш по URL**. Полный map-reduce для сверхдлинных текстов — тоже
 опционально (сейчас работает обрезка с предупреждением, см. PLAN, Этап 2).

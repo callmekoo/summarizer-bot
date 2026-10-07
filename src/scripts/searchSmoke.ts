@@ -13,6 +13,7 @@ import {
   fetchSearchJson,
   parseSearchResults,
   youtubeWatchUrl,
+  SEARCH_LIMIT,
 } from '../core/youtubeSearch.js';
 
 const args = process.argv.slice(2);
@@ -38,9 +39,11 @@ if (savePath) {
   console.log(`сырой ответ сохранён в ${savePath}`);
 }
 
-// Без лимита: видно всю выдачу, а не только первые 5.
+// Без лимита: видно всю выдачу, а не только то, что уйдёт в бот.
 const { hits, skipped } = parseSearchResults(json, Infinity);
-console.log(`\nпрошли фильтр (${hits.length}, в бот уйдут первые 5):`);
+console.log(
+  `\nпрошли фильтр (${hits.length}, в бот уйдут первые ${SEARCH_LIMIT}):`,
+);
 for (const h of hits) {
   console.log(`  ${h.duration.padStart(8)}  ${h.title} — ${h.channel ?? '?'}`);
   console.log(`            ${youtubeWatchUrl(h.id)}`);
