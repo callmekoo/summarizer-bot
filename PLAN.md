@@ -74,30 +74,40 @@ src/
   bot.ts            # точка входа: grammY, middleware, heartbeat, graceful shutdown
   config.ts         # чтение env (zod): токены, модели, лимиты, allowlist…
   commands.ts       # реестр команд: меню Telegram (setMyCommands) + текст /help
-  types.ts          # ExtractResult
+  types.ts          # ExtractResult, Chapter, TranscriptSegment, isVideo()
   handlers/
-    onLink.ts       # основной хендлер: URL → пайплайн → ответ + метрики (/summary и текст)
+    onLink.ts       # основной хендлер: URL → runSummary → ответ + метрики (/summary и текст)
     onStart.ts      # /start — приветствие
     onHelp.ts       # /help — справка из реестра команд
-    onArticle.ts    # /article — видео → статья .md
+    onArticle.ts    # /article — видео → статья .md (runArticle)
+    onSearch.ts     # /search — список видео; команды /sum_… /art_… из списка
   middleware/
     allowlist.ts    # фильтр по ALLOWED_USER_IDS (+ чистая isAllowed)
     rateLimit.ts    # лимит запросов/мин на пользователя
   core/
     extractor.ts    # обёртка над rdrr: таймаут, 3 ретрая, нормализация ошибок
-    summarizer.ts   # вызовы OpenRouter, промпты, обрезка по токенам, fallback
+    summarizer.ts   # пересказ: обрезка по токенам, бюджет объёма, вызов LLM
+    chunker.ts      # нарезка транскрипта по главам для /article, вырезание рекламы
+    article.ts      # сборка статьи: куски → LLM → markdown
     formatter.ts    # Telegram-HTML, шапка источника, разбивка ≤4096
+    youtubeSearch.ts # поиск на YouTube (InnerTube), фильтр эфиров, список для /search
   llm/
-    openrouter.ts   # клиент (openai SDK с baseURL OpenRouter)
-    prompts.ts      # системный и пользовательский промпты
+    client.ts       # клиент (openai SDK, baseURL из LLM_BASE_URL)
+    complete.ts     # единственное место вызова LLM: фолбэк-модель, 404/429
+    prompts.ts      # системный и пользовательский промпты, защита от инъекций
   lib/
-    url.ts          # извлечение и валидация ссылок
-    logger.ts       # pino
+    url.ts          # извлечение ссылок, /live/ID → watch?v=ID
+    logger.ts       # pino + вычистка секретов (redact.ts)
+    reply.ts        # «ответить на сообщение»
+    filename.ts     # имя .md-файла статьи
     concurrency.ts  # лимитер очереди (MAX_CONCURRENCY)
     rateLimiter.ts  # скользящее окно
+  scripts/
+    searchSmoke.ts  # живая проверка /search без бота (npm run search:smoke)
 ```
 
-> `chunker.ts` (для map-reduce) пока не создан — см. Этап 2, выбран быстрый вариант.
+> `chunker.ts` режет транскрипт только для `/article`. Map-reduce для **пересказа** не
+> делали — см. Этап 2, выбран быстрый вариант.
 
 Корень: `Dockerfile`, `docker-compose.yml`, `.dockerignore`, `tsconfig.json` /
 `tsconfig.build.json` (сборка без тестов).
@@ -241,7 +251,7 @@ src/
   верхнем уровне он поднимает polling).
 - **Готово:** меню Telegram, `/help` и роутинг перечисляют один и тот же набор команд.
 
-### Этап 7 — `/search`: поиск видео на YouTube → пересказ
+### Этап 7 — `/search`: поиск видео на YouTube → пересказ ✅
 Пересказ без ссылки: `/search <запрос>` → топ-5 видео со ссылками → команда → пересказ или статья.
 - [x] `core/youtubeSearch.ts` — `POST youtubei/v1/search` (InnerTube, тот же API, через который
   rdrr берёт субтитры): без ключа, квот и новых зависимостей. Фильтр «только видео» (`params`)
@@ -260,7 +270,7 @@ src/
   (обычные миксы с длительностью), 5 отсеяны как `live` (явная пометка эфира), 10 — как
   `no_duration`: это круглосуточные «radio / 24/7»-эфиры **без** явной пометки. Их ловит
   только правило «нет длительности → пропуск» — оно не перестраховка, а основной фильтр
-- [ ] Ручная проверка в Telegram: команды подсвечены целиком и работают, `/summary` по `/live/ID`
+- [x] Ручная проверка в Telegram (владелец): список, ссылки и команды работают
 - **Риск:** InnerTube неофициальный. Поменяется формат — в логах появится
   `search: в выдаче нет ни одного видео`, smoke-скрипт покажет то же.
 

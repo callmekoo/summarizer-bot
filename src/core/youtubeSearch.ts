@@ -44,7 +44,7 @@ export class SearchError extends Error {
 
 const SEARCH_URL =
   'https://www.youtube.com/youtubei/v1/search?prettyPrint=false';
-// Тот же WEB-клиент, что у rdrr для /next: перестанет приниматься — сломается и пересказ.
+// Та же версия WEB-клиента, что rdrr шлёт в InnerTube (/next, главы видео).
 const CLIENT = {
   clientName: 'WEB',
   clientVersion: '2.20240101.00.00',
@@ -57,7 +57,7 @@ const TIMEOUT_MS = 15_000;
 export const SEARCH_LIMIT = 5;
 
 /** id видео YouTube — ровно 11 символов base64url. */
-export const VIDEO_ID_RE = /^[\w-]{11}$/;
+const VIDEO_ID_RE = /^[\w-]{11}$/;
 
 /**
  * Команды под вариантами списка: `/sum_<код>` — пересказ, `/art_<код>` — статья.
@@ -93,11 +93,8 @@ export function youtubeWatchUrl(id: string): string {
   return `https://www.youtube.com/watch?v=${id}`;
 }
 
-export async function searchYoutube(
-  query: string,
-  limit = SEARCH_LIMIT,
-): Promise<SearchResults> {
-  return parseSearchResults(await fetchSearchJson(query), limit);
+export async function searchYoutube(query: string): Promise<SearchResults> {
+  return parseSearchResults(await fetchSearchJson(query));
 }
 
 /** Сырой ответ InnerTube. Отдельно — чтобы smoke-скрипт мог сохранить его в фикстуру. */
@@ -220,13 +217,13 @@ function collectVideoRenderers(root: unknown): Obj[] {
  */
 export function renderSearchList(hits: VideoHit[]): string {
   const items = hits.map((h, i) => {
-    const href = escapeHtml(`https://youtu.be/${h.id}`).replace(/"/g, '&quot;');
     const meta = [h.channel, h.duration]
       .filter((s): s is string => Boolean(s))
       .map(escapeHtml)
       .join(' · ');
     const commands = `${pickCommand('sum', h.id)} · ${pickCommand('art', h.id)}`;
-    return `${i + 1}. <a href="${href}">${escapeHtml(h.title)}</a>\n${meta}\n${commands}`;
+    // id уже проверен VIDEO_ID_RE ([\w-]), в атрибуте его экранировать незачем.
+    return `${i + 1}. <a href="https://youtu.be/${h.id}">${escapeHtml(h.title)}</a>\n${meta}\n${commands}`;
   });
   // Без слэш-команд в шапке: голая «/sum» тоже подсветится, а по нажатию бот её не поймёт.
   const head =
