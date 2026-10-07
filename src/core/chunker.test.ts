@@ -1,7 +1,22 @@
-import { test } from 'node:test';
+import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
-import { chunkTranscript, stripAdChapters, isAdChapter } from './chunker.js';
+import type * as Chunker from './chunker.js';
 import type { Chapter, TranscriptSegment } from '../types.js';
+
+// chunker → logger → config валидирует env при импорте, поэтому задаём окружение
+// заранее и подгружаем модуль динамически (как в summarizer.test.ts).
+let chunkTranscript: typeof Chunker.chunkTranscript;
+let stripAdChapters: typeof Chunker.stripAdChapters;
+let isAdChapter: typeof Chunker.isAdChapter;
+
+before(async () => {
+  process.env.DOTENV_CONFIG_PATH = '/dev/null'; // не зависеть от реального .env
+  process.env.BOT_TOKEN = 'test-token';
+  process.env.LLM_API_KEY = 'test-key';
+  process.env.MODEL = 'test/model';
+  ({ chunkTranscript, stripAdChapters, isAdChapter } =
+    await import('./chunker.js'));
+});
 
 /** Сегменты с уникальными текстами s0, s1… — так легко проверить порядок и полноту. */
 function segments(
