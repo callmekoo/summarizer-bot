@@ -174,7 +174,9 @@ src/
   Фильтр «по одному пользователю или по всем» — условием `(? IS NULL OR user_id = ?)`.
 - **Содержимое чужих запросов не храним и не логируем** (решение владельца). В базе нет url,
   заголовков, поисковых запросов, имён файлов. В логах поля `url`/`title`/`query`/`file` —
-  только через `sourceLogFields(isAdmin, …)`: для не-владельца `host` и `ext`.
+  только через `sourceLogFields(isAdmin, …)`: для не-владельца `host` и `ext`. Поле `err`
+  сериализует `lib/errorLog.ts`: вырезает `payload` (у `GrammyError` там текст сообщения,
+  подпись, файл) и `metadata` (у OpenRouter — фрагмент входа). Не обходи его своим `err`.
 - **Админские команды** регистрируются на `admin = bot.filter(isAdmin)` (`admin.command`), в
   реестре `commands.ts` — с `admin: true`: в `/help` их нет, меню владельцу ставится
   отдельно (`setMyCommands` со `scope: chat`). Кнопки заявки работают только по `pending`
