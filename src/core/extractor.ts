@@ -1,4 +1,6 @@
 import { logger } from '../lib/logger.js';
+import { currentRequest } from '../lib/requestContext.js';
+import { sourceLogFields } from '../lib/privacy.js';
 import type { Chapter, ExtractResult, TranscriptSegment } from '../types.js';
 
 export type ExtractErrorKind = 'empty' | 'timeout' | 'failed';
@@ -80,7 +82,10 @@ export async function extract(url: string): Promise<ExtractResult> {
       if (err instanceof ExtractError && err.kind === 'empty') throw err;
       lastErr = err;
       if (attempt < MAX_ATTEMPTS) {
-        logger.warn({ err, url, attempt }, 'rdrr: транзиентный сбой, повтор');
+        logger.warn(
+          { err, ...logUrl(url), attempt },
+          'rdrr: транзиентный сбой, повтор',
+        );
         await sleep(BACKOFF_MS * attempt);
       }
     }
@@ -88,7 +93,7 @@ export async function extract(url: string): Promise<ExtractResult> {
 
   // Попытки исчерпаны.
   if (lastErr instanceof ExtractError) throw lastErr; // таймаут
-  logger.error({ err: lastErr, url }, 'rdrr parse failed');
+  logger.error({ err: lastErr, ...logUrl(url) }, 'rdrr parse failed');
   throw new ExtractError('failed', 'не удалось извлечь текст по ссылке');
 }
 
@@ -153,4 +158,9 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
       },
     );
   });
+}
+
+/** url для лога: чужим запросам — только домен (вне запроса — тоже, на всякий случай). */
+function logUrl(url: string): Record<string, unknown> {
+  return sourceLogFields(currentRequest()?.isAdmin ?? false, { url });
 }

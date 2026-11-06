@@ -36,6 +36,7 @@ export async function onDocument(ctx: Context): Promise<void> {
   await summarizeSource(
     ctx,
     {
+      command: 'file',
       status: '⏳ Читаю файл…',
       log: { file: fileName, format, bytes: doc.file_size },
       load: async () => {

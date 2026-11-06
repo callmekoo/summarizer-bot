@@ -12,6 +12,9 @@ import { createLimiter } from '../lib/concurrency.js';
 import { replyTo } from '../lib/reply.js';
 import { config } from '../config.js';
 import { logger } from '../lib/logger.js';
+import { withRequest } from '../lib/requestContext.js';
+import { sourceLogFields } from '../lib/privacy.js';
+import { getDb } from '../lib/store.js';
 
 // Глобальный лимит одновременных тяжёлых обработок (parse + LLM): защищает от
 // шторма 429 при нескольких ссылках подряд. Лишние ждут в очереди.
@@ -33,6 +36,8 @@ export async function onLink(ctx: Context): Promise<void> {
 
 /** Откуда берётся текст для пересказа: ссылка или присланный файл. */
 export interface SummarySource {
+  /** Команда для статистики: ссылка или присланный файл. */
+  command: 'summary' | 'file';
   /** Статус, пока идёт обработка. */
   status: string;
   /** Поля строки метрик `request`, по которым видно источник: `{ url }`, `{ file, … }`. */
@@ -61,6 +66,7 @@ export async function runSummary(
   await summarizeSource(
     ctx,
     {
+      command: 'summary',
       status: '⏳ Обрабатываю ссылку…',
       log: { url },
       load: async () => {
@@ -90,6 +96,28 @@ export async function summarizeSource(
   source: SummarySource,
   replyToMessageId: number | undefined,
 ): Promise<void> {
+  const user = requestUser(ctx);
+  await withRequest({ db: getDb(), now: Date.now }, user, source.command, () =>
+    summarizeTracked(ctx, source, replyToMessageId, user.isAdmin),
+  );
+}
+
+/** Кто делает запрос — для статистики и приватности логов. */
+export function requestUser(ctx: Context): {
+  userId: number;
+  isAdmin: boolean;
+} {
+  const userId = ctx.from?.id ?? 0;
+  return { userId, isAdmin: userId === config.ADMIN_USER_ID };
+}
+
+/** Тело summarizeSource внутри учтённого запроса; true — пересказ доставлен. */
+async function summarizeTracked(
+  ctx: Context,
+  source: SummarySource,
+  replyToMessageId: number | undefined,
+  isAdmin: boolean,
+): Promise<boolean> {
   const status = await ctx.reply(source.status);
   // Держим индикатор «печатает», пока идёт загрузка + запрос к LLM.
   const typing = setInterval(() => {
@@ -135,7 +163,7 @@ export async function summarizeSource(
     // Метрики: одна строка на успешный запрос.
     logger.info(
       {
-        ...source.log,
+        ...sourceLogFields(isAdmin, source.log),
         ok: true,
         model: result.model,
         parseMs,
@@ -152,13 +180,14 @@ export async function summarizeSource(
       },
       'request',
     );
+    return true;
   } catch (err) {
     await ctx.reply(userMessageForError(err), replyTo(replyToMessageId));
     // Метрики: одна строка на неуспешный запрос (err тоже логируем для деталей).
     logger.error(
       {
         err,
-        ...source.log,
+        ...sourceLogFields(isAdmin, source.log),
         ok: false,
         reason: errorReason(err),
         parseMs,
@@ -168,6 +197,7 @@ export async function summarizeSource(
       },
       'request',
     );
+    return false;
   } finally {
     clearInterval(typing);
     await ctx.api
