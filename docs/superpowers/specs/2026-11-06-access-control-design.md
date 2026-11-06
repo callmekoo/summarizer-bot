@@ -118,6 +118,38 @@ CREATE INDEX llm_calls_request ON llm_calls(request_id);
   другому человеку: `touchProfile`, записывая ник, обнуляет его у других строк. Так в базе
   у каждого ника не больше одного владельца — актуального.
 
+### Имена: хранение и показ
+
+Имя, фамилия и ник **хранятся как прислал Telegram** (запросы параметризованные — SQL-
+инъекции нет, а исходник не теряем). Чистка — **при показе**, в одной чистой функции
+`displayName(user)` (`core/users.ts`), через которую идут все места вывода: уведомление о
+заявке, его редактирование после решения, `/users`, `/stats`. Telegram гарантирует только
+непустое `first_name`; `last_name` и `username` бывают `NULL`.
+
+`displayName`:
+
+1. Удаляет `\p{Cc}` и `\p{Cf}` — управляющие символы, переводы строк, символы нулевой
+   ширины, переключатели направления (U+202A–202E, U+2066–2069, U+200E/F). Исключение —
+   ZWJ (U+200D) между двумя эмодзи (`\p{Extended_Pictographic}`): на нём держатся составные
+   эмодзи вроде 👨‍👩‍👧; одинокий или стоящий не между эмодзи — удаляется.
+2. Оставляет не более 2 подряд комбинируемых знаков `\p{M}` (против Zalgo).
+3. Схлопывает пробельные последовательности в один пробел, `trim`, обрезает до 64 символов
+   (по code points) с «…».
+4. Пусто после чистки → «без имени». Нет `username` → «без ника».
+
+Результат дальше идёт через `escapeHtml` как обычно.
+
+**Против подделки** (имя «Иван ✅ одобрен», «Мама (@mama_real)») — раскладка: имя в
+кавычках «…» отдельной строкой, ник и id — отдельными строками из данных Telegram (ник —
+только `[A-Za-z0-9_]`, его не подделать), id — ссылкой `tg://user?id=…` на настоящий профиль:
+
+```
+Новая заявка
+Имя: «Иван Петров»
+Ник: @ivanp
+id: 123456789 (профиль)
+```
+
 ### Стоимость
 
 - Для OpenRouter (хост `LLM_BASE_URL` — `openrouter.ai`) к запросу добавляется
@@ -158,6 +190,7 @@ CREATE INDEX llm_calls_request ON llm_calls(request_id);
 | `db/users.ts` | `getUser`, `touchProfile`, `createApplication`, `setStatus`, `listUsers`, `findUser(idOrUsername)`, `seedApproved(ids)`. Принимает `db` параметром. | `db` |
 | `db/usage.ts` | `startRequest`, `finishRequest`, `recordLlmCall`, `totals(range, userId?)`, `topUsers(range, n)`, `commandBreakdown(userId)`, `lastRequestAt(userId)`. Принимает `db` параметром. | `db` |
 | `core/access.ts` | Чистая `decideAccess(user, isAdmin, now)` → `pass` / `apply` / `pending` / `rejected(until)` / `ignore`. Вся логика статусов и кулдауна здесь. | — |
+| `core/users.ts` | Чистый `displayName(user)` — безопасное имя для показа (см. «Имена»). | — |
 | `core/stats.ts` | Чистый `renderStats(...)`, `renderUserStats(...)`, `renderUsers(...)` → Telegram-HTML (с `escapeHtml`). | `formatter` |
 | `lib/requestContext.ts` | AsyncLocalStorage: `runInRequest(ctx, fn)`, `currentRequest()`. | — |
 | `lib/privacy.ts` | `sourceLogFields(isAdmin, { url?, title?, query?, file? })` → для админа как есть, для остальных `{ host }` / `{ ext }`. | — |
@@ -215,6 +248,9 @@ CREATE INDEX llm_calls_request ON llm_calls(request_id);
 - `db/users.test.ts`, `db/usage.test.ts` — на `:memory:`: заявка → одобрение → запрос с
   вызовами → агрегаты по периодам и по пользователю, разбивка по командам, поиск по
   нику без учёта регистра, `seedApproved` не перетирает бан, вызовы без стоимости.
+- `core/users.test.ts` — `displayName`: только невидимые символы → «без имени», RTL-override,
+  переводы строк, Zalgo, имя длиннее 64, `last_name`/`username` = `null`, эмодзи и
+  кириллица не страдают.
 - `core/stats.test.ts` — экранирование, «$ —» / частичная стоимость, пустая база.
 - `lib/privacy.test.ts` — админ / не админ, url → host, файл → расширение, битый url.
 - `llm/complete.test.ts` — разбор `usage.cost` (число, нет поля, мусор), флаг только для
