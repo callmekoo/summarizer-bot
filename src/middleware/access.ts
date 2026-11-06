@@ -23,12 +23,14 @@ export function isAdmin(ctx: Context): boolean {
   return ctx.from?.id === config.ADMIN_USER_ID;
 }
 
+/** `Иван Петров (@ivanp), id 123` — Telegram-HTML. */
+export function renderUserLine(user: UserRow): string {
+  return `${escapeHtml(displayName(user))} (${displayUsername(user.username)}), id ${user.id}`;
+}
+
 /** `Новая заявка: Иван Петров (@ivanp), id 123` — Telegram-HTML. */
 export function renderApplication(user: UserRow): string {
-  return (
-    `Новая заявка: ${escapeHtml(displayName(user))} ` +
-    `(${displayUsername(user.username)}), id ${user.id}`
-  );
+  return `Новая заявка: ${renderUserLine(user)}`;
 }
 
 export function applicationKeyboard(userId: number): InlineKeyboard {
