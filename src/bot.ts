@@ -10,20 +10,49 @@ import { onDocument } from './handlers/onDocument.js';
 import { onSearch, onSearchCommand } from './handlers/onSearch.js';
 import { PICK_COMMAND_RE } from './core/youtubeSearch.js';
 import { COMMANDS } from './commands.js';
-import { allowlist } from './middleware/allowlist.js';
+import {
+  createAccess,
+  renderApplication,
+  applicationKeyboard,
+} from './middleware/access.js';
 import { rateLimit } from './middleware/rateLimit.js';
+import { initStore } from './lib/store.js';
+import { seedApproved } from './db/users.js';
+import type { Db } from './db/database.js';
+
+// База пользователей и статистики. Без неё проверка доступа невозможна, а работать без
+// проверки — значит тратить деньги на кого угодно. Поэтому не открылась — выходим.
+let db: Db;
+try {
+  db = await initStore();
+} catch (err) {
+  logger.fatal(
+    { err, path: config.DB_PATH },
+    'не удалось открыть базу (DB_PATH): проверь путь и права на каталог',
+  );
+  process.exit(1);
+}
+seedApproved(db, config.ALLOWED_USER_IDS, Date.now());
+logger.info(
+  { admin: config.ADMIN_USER_ID, preapproved: config.ALLOWED_USER_IDS.length },
+  'доступ по заявкам включён',
+);
 
 const bot = new Bot(config.BOT_TOKEN);
 
-if (config.ALLOWED_USER_IDS.length === 0) {
-  logger.warn(
-    'ALLOWED_USER_IDS пуст — бот отвечает всем. Укажи свой Telegram ID в .env.',
-  );
-} else {
-  logger.info({ count: config.ALLOWED_USER_IDS.length }, 'allowlist включён');
-}
-
-bot.use(allowlist);
+bot.use(
+  createAccess({
+    db,
+    adminId: config.ADMIN_USER_ID,
+    now: Date.now,
+    notifyAdmin: async (user) => {
+      await bot.api.sendMessage(config.ADMIN_USER_ID, renderApplication(user), {
+        parse_mode: 'HTML',
+        reply_markup: applicationKeyboard(user.id),
+      });
+    },
+  }),
+);
 bot.use(rateLimit);
 // До общего обработчика текста, иначе `/article <url>` уйдёт в пересказ.
 bot.command('summary', onLink);
