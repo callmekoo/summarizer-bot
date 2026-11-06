@@ -14,6 +14,9 @@ test('config: парсинг, дефолты и обратная совмест�
   process.env.ALLOWED_USER_IDS = '111, 222 ,333';
   process.env.MAX_INPUT_TOKENS = '5000';
   process.env.MODEL = 'test/model';
+  process.env.ADMIN_USER_ID = '42';
+  delete process.env.DB_PATH;
+  delete process.env.ACCESS_RETRY_DAYS;
   delete process.env.MODEL_FALLBACK;
 
   const { config } = await import('./config.js');
@@ -31,4 +34,8 @@ test('config: парсинг, дефолты и обратная совмест�
   // MODEL обязателен (без дефолта), MODEL_FALLBACK опционален
   assert.equal(config.MODEL, 'test/model');
   assert.equal(config.MODEL_FALLBACK, undefined);
+  // доступ: id админа обязателен, база и кулдаун — с дефолтами
+  assert.equal(config.ADMIN_USER_ID, 42);
+  assert.equal(config.DB_PATH, 'data/bot.db');
+  assert.equal(config.ACCESS_RETRY_DAYS, 7);
 });

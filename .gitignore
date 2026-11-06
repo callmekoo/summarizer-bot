@@ -5,3 +5,4 @@ dist/
 
 # локальные настройки Claude Code (не коммитим)
 .claude/settings.local.json
+data/

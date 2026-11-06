@@ -11,6 +11,7 @@ before(async () => {
   process.env.BOT_TOKEN = 'test-token';
   process.env.LLM_API_KEY = 'test-key';
   process.env.MODEL = 'test/model';
+  process.env.ADMIN_USER_ID = '1';
   ({ retryAfterMs } = await import('./complete.js'));
 });
 
