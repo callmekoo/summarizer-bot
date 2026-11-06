@@ -17,11 +17,15 @@ services:
     # Метка для autoheal (см. опциональный сервис ниже).
     labels:
       autoheal: "true"
-    # Кастомный системный промпт без пересборки образа: создай prompt.txt рядом с
-    # этим файлом, поставь SYSTEM_PROMPT_FILE=/app/prompt.txt в .env и раскомментируй.
-    # Правишь prompt.txt → docker compose restart bot.
-    # volumes:
-    #   - ./prompt.txt:/app/prompt.txt:ro
+    volumes:
+      # База пользователей и статистики (DB_PATH=data/bot.db → /app/data/bot.db).
+      # Именованный том, а не ./data: каталог хоста создался бы от root, и бот (USER node)
+      # не смог бы в него писать. Бэкап: docker compose cp bot:/app/data/bot.db .
+      - bot-data:/app/data
+      # Кастомный системный промпт без пересборки образа: создай prompt.txt рядом с
+      # этим файлом, поставь SYSTEM_PROMPT_FILE=/app/prompt.txt в .env и раскомментируй.
+      # Правишь prompt.txt → docker compose restart bot.
+      # - ./prompt.txt:/app/prompt.txt:ro
 
   # --- Опционально: автоперезапуск по healthcheck ---------------------------
   # restart: unless-stopped перезапускает контейнер, только когда процесс ВЫШЕЛ.
@@ -38,3 +42,6 @@ services:
   #     AUTOHEAL_CONTAINER_LABEL: autoheal
   #   volumes:
   #     - /var/run/docker.sock:/var/run/docker.sock
+
+volumes:
+  bot-data:
