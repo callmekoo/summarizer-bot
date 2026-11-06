@@ -109,3 +109,16 @@ test('имя с SQL сохраняется как есть, таблица жи�
   assert.equal(getUser(db, 1)?.firstName, evil);
   assert.equal(count(), 1);
 });
+
+test('seedApproved не возвращает доступ отозванному (рестарт после /revoke)', () => {
+  seedApproved(db, [1], NOW);
+  setStatus(db, 1, 'rejected', NOW + 1, NOW + 7 * DAY);
+  seedApproved(db, [1], NOW + 2);
+  assert.equal(getUser(db, 1)?.status, 'rejected');
+});
+
+test('seedApproved одобряет ждущую заявку', () => {
+  createApplication(db, { id: 1 }, NOW);
+  seedApproved(db, [1], NOW);
+  assert.equal(getUser(db, 1)?.status, 'approved');
+});

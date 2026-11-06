@@ -92,7 +92,11 @@ export function setStatus(
   return getUser(db, id);
 }
 
-/** Одобренные заранее (ALLOWED_USER_IDS). Бан, поставленный вручную, не снимается. */
+/**
+ * Одобренные заранее (ALLOWED_USER_IDS). Добавляет новых и одобряет ждущих; решение
+ * владельца (отказ, /revoke, бан) не перебивает — иначе рестарт молча вернул бы доступ.
+ * Вернуть человека — /approve.
+ */
 export function seedApproved(
   db: Db,
   ids: readonly number[],
@@ -102,7 +106,7 @@ export function seedApproved(
     `INSERT INTO users (id, status, decided_at) VALUES (?, 'approved', ?)
      ON CONFLICT(id) DO UPDATE SET status = 'approved', decided_at = excluded.decided_at,
        retry_after = NULL
-     WHERE users.status NOT IN ('approved', 'banned')`,
+     WHERE users.status = 'pending'`,
   );
   for (const id of ids) stmt.run(id, now);
 }

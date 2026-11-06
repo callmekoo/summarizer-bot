@@ -297,7 +297,8 @@ src/
 одобрения владельца. Спека: [docs/superpowers/specs/2026-11-06-access-control-design.md](docs/superpowers/specs/2026-11-06-access-control-design.md).
 - [x] SQLite через встроенный `node:sqlite` (без зависимостей), `DB_PATH`, схема `users` /
   `requests` / `llm_calls`, Docker-том `bot-data`; Node ≥ 22.13
-- [x] `ADMIN_USER_ID` (обязателен); `ALLOWED_USER_IDS` — одобренные заранее (бан не снимают)
+- [x] `ADMIN_USER_ID` (обязателен); `ALLOWED_USER_IDS` — одобренные заранее (решения
+  владельца — отказ, `/revoke`, бан — не перебивают)
 - [x] Заявка: любое первое сообщение незнакомца → владельцу «Новая заявка: имя (@ник), id»
   с кнопками ✅/❌/🚫; повторные сообщения — «на рассмотрении» без нового уведомления
 - [x] Отказ — кулдаун `ACCESS_RETRY_DAYS` (деф. 7) с датой; бан — молчание
