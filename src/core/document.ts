@@ -146,9 +146,11 @@ export async function readDocument(
 
   let result: ReadDocumentResult;
   switch (format) {
-    case 'text':
-      result = { markdown: raw.trim(), title: markdownTitle(raw) };
+    case 'text': {
+      const text = decodeMarkdownEntities(raw.trim());
+      result = { markdown: text, title: markdownTitle(text) };
       break;
+    }
     case 'subtitles':
       result = { markdown: subtitlesToText(raw) };
       break;
@@ -250,6 +252,9 @@ function inlineText(fragment: string): string {
   return decodeEntities(stripToLine(fragment));
 }
 
+// XML знает только первые пять; остальное — типографика, которая реально встречается в
+// markdown и вёрстке (полная таблица HTML5 — 2000+ имён, ради неё нужна зависимость).
+// Незнакомое имя оставляем как есть: лучше видимый `&foo;`, чем потерянный текст.
 const NAMED_ENTITIES: Record<string, string> = {
   amp: '&',
   lt: '<',
@@ -257,18 +262,76 @@ const NAMED_ENTITIES: Record<string, string> = {
   quot: '"',
   apos: "'",
   nbsp: ' ',
+  ensp: ' ',
+  emsp: ' ',
+  thinsp: ' ',
+  shy: '­',
+  ndash: '–',
+  mdash: '—',
+  minus: '−',
+  hellip: '…',
+  laquo: '«',
+  raquo: '»',
+  ldquo: '“',
+  rdquo: '”',
+  bdquo: '„',
+  lsquo: '‘',
+  rsquo: '’',
+  sbquo: '‚',
+  middot: '·',
+  bull: '•',
+  copy: '©',
+  reg: '®',
+  trade: '™',
+  deg: '°',
+  times: '×',
+  divide: '÷',
+  plusmn: '±',
+  sect: '§',
+  para: '¶',
+  euro: '€',
+  larr: '←',
+  rarr: '→',
+  uarr: '↑',
+  darr: '↓',
+  harr: '↔',
+  frac12: '½',
+  frac14: '¼',
+  frac34: '¾',
 };
 
-/** XML-сущности. Зовём последним: раскодированный `&lt;` иначе приняли бы за тег. */
+/** HTML/XML-сущности. В FB2 зовём последним: раскодированный `&lt;` иначе приняли бы за тег. */
 function decodeEntities(s: string): string {
-  return s.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m, code: string) => {
-    if (code[0] === '#') {
-      const n =
-        code[1] === 'x' || code[1] === 'X'
-          ? parseInt(code.slice(2), 16)
-          : parseInt(code.slice(1), 10);
-      return Number.isFinite(n) && n <= 0x10ffff ? String.fromCodePoint(n) : m;
-    }
-    return NAMED_ENTITIES[code.toLowerCase()] ?? m;
-  });
+  return s.replace(
+    /&(#x[0-9a-f]+|#\d+|[a-z][a-z0-9]*);/gi,
+    (m, code: string) => {
+      if (code[0] === '#') {
+        const n =
+          code[1] === 'x' || code[1] === 'X'
+            ? parseInt(code.slice(2), 16)
+            : parseInt(code.slice(1), 10);
+        return Number.isFinite(n) && n <= 0x10ffff
+          ? String.fromCodePoint(n)
+          : m;
+      }
+      // Имена регистрозависимы (&Dagger; ≠ &dagger;), поэтому без toLowerCase.
+      return NAMED_ENTITIES[code] ?? m;
+    },
+  );
+}
+
+// Код в markdown: блоки ``` / ~~~ (незакрытый — до конца файла) и инлайн `…`. Скобка
+// захватывающая — split кладёт код на нечётные места.
+const MARKDOWN_CODE = /(```[\s\S]*?(?:```|$)|~~~[\s\S]*?(?:~~~|$)|`[^`\n]+`)/;
+
+/**
+ * Сущности в markdown — часть синтаксиса: рендерер раскодировал бы `&nbsp;` везде, кроме
+ * кода. Мы markdown не рендерим, поэтому делаем это сами — иначе `&nbsp;` из заголовка
+ * попадает в шапку литералом, а из текста — в пересказ (модель копирует его как есть).
+ */
+function decodeMarkdownEntities(md: string): string {
+  return md
+    .split(MARKDOWN_CODE)
+    .map((part, i) => (i % 2 ? part : decodeEntities(part)))
+    .join('');
 }

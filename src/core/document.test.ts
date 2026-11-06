@@ -217,3 +217,32 @@ test('readDocument: FB2 в windows-1251 — декодируется по фол
   const doc = await readDocument(bytes, 'fb2');
   assert.equal(doc.markdown, 'Текст');
 });
+
+test('readDocument: HTML-сущности в markdown раскодируются — и в заголовке, и в тексте', async () => {
+  const md =
+    '# Introducing GNOME&nbsp;51, &laquo;A Coruña&raquo;\n\nGNOME&nbsp;51 &mdash; релиз&hellip;';
+  const doc = await readDocument(utf8(md), 'text');
+  assert.equal(doc.title, 'Introducing GNOME 51, «A Coruña»');
+  assert.ok(doc.markdown.includes('GNOME 51 — релиз…'), doc.markdown);
+  assert.ok(!doc.markdown.includes('&'), doc.markdown);
+});
+
+test('readDocument: внутри кода сущности остаются как есть (как в CommonMark)', async () => {
+  const md = [
+    'Пробел &nbsp; и `&nbsp;` в строке.',
+    '```html',
+    '<p>a&nbsp;b &amp; c</p>',
+    '```',
+  ].join('\n');
+  const doc = await readDocument(utf8(md), 'text');
+  assert.ok(doc.markdown.startsWith('Пробел   и `&nbsp;`'), doc.markdown);
+  assert.ok(doc.markdown.includes('<p>a&nbsp;b &amp; c</p>'), doc.markdown);
+});
+
+test('readDocument: незнакомая сущность и голый амперсанд не ломаются', async () => {
+  const doc = await readDocument(
+    utf8('A &unknownthing; B & C &#x1F600;'),
+    'text',
+  );
+  assert.equal(doc.markdown, 'A &unknownthing; B & C 😀');
+});
