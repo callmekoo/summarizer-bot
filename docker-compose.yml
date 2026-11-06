@@ -20,7 +20,8 @@ services:
     volumes:
       # База пользователей и статистики (DB_PATH=data/bot.db → /app/data/bot.db).
       # Именованный том, а не ./data: каталог хоста создался бы от root, и бот (USER node)
-      # не смог бы в него писать. Бэкап: docker compose cp bot:/app/data/bot.db .
+      # не смог бы в него писать. Бэкап — через VACUUM INTO (база в WAL, копия одного
+      # bot.db выйдет старой), команды в README, раздел «Доступ и статистика».
       - bot-data:/app/data
       # Кастомный системный промпт без пересборки образа: создай prompt.txt рядом с
       # этим файлом, поставь SYSTEM_PROMPT_FILE=/app/prompt.txt в .env и раскомментируй.

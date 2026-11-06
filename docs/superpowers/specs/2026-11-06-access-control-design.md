@@ -216,7 +216,8 @@ CREATE INDEX llm_calls_request ON llm_calls(request_id);
 - **`Dockerfile`**: `RUN mkdir -p /app/data && chown node:node /app/data` до `USER node`.
 - **`docker-compose.yml`**: **именованный** volume `bot-data:/app/data` (а не `./data`):
   именованный том наследует владельца `node` из образа, bind-mount каталога хоста был бы
-  root-ом и бот не смог бы писать. Бэкап — `docker compose cp bot:/app/data/bot.db .`.
+  root-ом и бот не смог бы писать. Бэкап — снимок `VACUUM INTO` (база в WAL: копия одного
+  `bot.db` выходит старой), затем `docker compose cp`; команды — в README.
 - **`.gitignore` / `.dockerignore`**: `data/`. **`.env.example`**: `ADMIN_USER_ID`, `DB_PATH`,
   `ACCESS_RETRY_DAYS`, `TZ`.
 - **Доки**: README (настройка, «сначала напиши боту `/start` сам», бэкап), AGENTS

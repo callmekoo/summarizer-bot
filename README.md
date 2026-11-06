@@ -229,11 +229,26 @@ curl -s https://openrouter.ai/api/v1/models | \
 вместо имени файла — расширение, заголовки и поисковые запросы не пишутся.
 
 **Хранилище** — SQLite (встроенный `node:sqlite`, нужен Node ≥ 22.13), файл `DB_PATH`.
-В Docker — именованный том `bot-data`. Бэкап:
+В Docker — именованный том `bot-data`.
+
+**Бэкап.** Просто скопировать `bot.db` нельзя: база в режиме WAL, свежие записи лежат в
+`bot.db-wal`, и копия одного файла выходит старой (а то и пустой). Снимок делает сам SQLite
+(`VACUUM INTO`), потом его забираем и удаляем из тома:
 
 ```sh
-docker compose cp bot:/app/data/bot.db ./bot.db
+docker compose exec bot node --no-warnings -e "new (require('node:sqlite').DatabaseSync)('data/bot.db').exec(\"VACUUM INTO 'data/backup.db'\")"
 ```
+
+```sh
+docker compose cp bot:/app/data/backup.db ./bot-backup.db
+```
+
+```sh
+docker compose exec bot rm data/backup.db
+```
+
+Восстановить: остановить бота, положить файл в том как `bot.db` (без старых `bot.db-wal` и
+`bot.db-shm`) и поднять снова.
 
 ## Команда `/article` — видео в статью
 
