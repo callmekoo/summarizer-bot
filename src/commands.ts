@@ -1,4 +1,5 @@
 import { escapeHtml } from './core/formatter.js';
+import { supportedExtensions } from './core/document.js';
 
 /**
  * Единственный источник правды по командам бота. Знать о них хотят три места: роутинг в
@@ -52,9 +53,11 @@ export const COMMANDS: BotCommand[] = [
   { command: 'start', description: 'краткое приветствие' },
 ];
 
-// Главное, чего нет в списке команд: команда для пересказа не обязательна.
+// Главное, чего нет в списке команд: команда для пересказа не обязательна, а пересказать
+// можно и присланный файл.
 const FOOTER =
-  'Ссылку можно прислать и просто сообщением, без команды — это то же самое, что /summary.';
+  'Ссылку можно прислать и просто сообщением, без команды — это то же самое, что /summary.\n\n' +
+  `Ещё можно прислать файл — перескажу так же, как страницу по ссылке. Читаю ${supportedExtensions()}.`;
 
 /** Справка для /help: Telegram-HTML, готовый к отправке. */
 export function renderHelp(): string {
@@ -63,5 +66,5 @@ export function renderHelp(): string {
     const head = `<b>/${c.command}${args}</b> — ${escapeHtml(c.description)}`;
     return c.details ? `${head}\n${escapeHtml(c.details)}` : head;
   });
-  return ['<b>Что я умею</b>', ...blocks, FOOTER].join('\n\n');
+  return ['<b>Что я умею</b>', ...blocks, escapeHtml(FOOTER)].join('\n\n');
 }

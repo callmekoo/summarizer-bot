@@ -20,5 +20,5 @@ export async function rateLimit(
   }
 
   const sec = Math.ceil(retryAfterMs / 1000);
-  await ctx.reply(`⏱ Слишком часто. Подожди ${sec} с и пришли ссылку снова.`);
+  await ctx.reply(`⏱ Слишком часто. Подожди ${sec} с и повтори запрос.`);
 }

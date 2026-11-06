@@ -162,3 +162,11 @@ test('renderSourceHeader: только сайт, без заголовка', () 
 test('renderSourceHeader: нет метаданных → пустая строка', () => {
   assert.equal(renderSourceHeader({ url: 'https://x.test' }), '');
 });
+
+test('renderSourceHeader: файл — заголовок без ссылки и имя файла', () => {
+  assert.equal(
+    renderSourceHeader({ title: 'Конспект <1>', file: 'notes & co.md' }),
+    '<b>Конспект &lt;1&gt;</b>\n📄 notes &amp; co.md',
+  );
+  assert.equal(renderSourceHeader({ file: 'lecture.srt' }), '📄 lecture.srt');
+});

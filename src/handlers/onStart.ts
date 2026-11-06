@@ -9,7 +9,8 @@ export async function onStart(ctx: Context): Promise<void> {
       '<code>/article &lt;ссылка&gt;</code> — соберу из видео полноценную статью и пришлю ' +
       '.md-файлом;\n' +
       '<code>/search &lt;запрос&gt;</code> — найду видео на YouTube; выбранное перескажу ' +
-      'или разверну в статью.\n\n' +
+      'или разверну в статью;\n' +
+      'пришли файл (.md, .txt, .html, субтитры, .fb2) — перескажу и его.\n\n' +
       'Все команды и подробности — /help',
     { parse_mode: 'HTML', link_preview_options: { is_disabled: true } },
   );

@@ -49,7 +49,7 @@ npm start          # node dist/bot.js (прод)
 
 **Тесты:** встроенный `node:test` + `node:assert`, без внешних зависимостей. Файлы
 рядом с кодом (`*.test.ts`). Покрыты чистые модули (formatter, url, allowlist, парсинг
-config, разбор выдачи и список `/search`). Сетевые вызовы (rdrr, OpenRouter) в юнит-тестах не дёргаем — для них чистую
+config, разбор выдачи и список `/search`, разбор файлов). Сетевые вызовы (rdrr, OpenRouter) в юнит-тестах не дёргаем — для них чистую
 логику выносим в тестируемые функции (напр. `isAllowed`, `retryAfterMs`).
 
 ## Архитектура
@@ -57,6 +57,8 @@ config, разбор выдачи и список `/search`). Сетевые в�
 Три пайплайна:
 
 - **Пересказ** (любой текст): `onLink` → `extract` → `summarize` → `formatter` → HTML в чат.
+  Общий путь — `summarizeSource(source)`: источник отдаёт текст + шапку. Присланный файл
+  идёт туда же: `onDocument` → `checkDocument` → скачивание → `readDocument` → `summarize`.
 - **Поиск** (`/search`): `onSearch` → `searchYoutube` → список со ссылками и командами
   `/sum_<id>` / `/art_<id>` → `onSearchCommand` → тот же `runSummary` / `runArticle`.
 - **Статья** (`/article`): `onArticle` → `extract` → `buildArticle` → `.md`-файлом.
@@ -69,12 +71,15 @@ src/
                     регистрация меню команд (setMyCommands)
   config.ts         env + zod; падает с понятной ошибкой при невалидном .env
   commands.ts       реестр команд: имена, описания, renderHelp(). Хендлеров тут нет
-  handlers/         onStart, onHelp, onLink (/summary + текст, runSummary), onArticle
-                    (/article, runArticle), onSearch (/search + команды /sum_ /art_)
+  handlers/         onStart, onHelp, onLink (/summary + текст, runSummary, summarizeSource),
+                    onArticle (/article, runArticle), onSearch (/search + команды /sum_ /art_),
+                    onDocument (присланный файл → пересказ)
   middleware/       allowlist (ALLOWED_USER_IDS), rateLimit (RATE_LIMIT_PER_MIN)
   core/
     extractor.ts    rdrr.parse(url) с таймаутом + 3 ретрая; ошибки → ExtractError(kind).
                     Для youtube отдаёт ещё chapters[] и transcript[] (нужны статье)
+    document.ts     файл → текст: формат по расширению, кодировка (UTF-8/16/cp1251),
+                    HTML через rdrr.parseHtml, субтитры, FB2. Без config — тесты без .env
     summarizer.ts   пересказ: обрезка по токенам + бюджет объёма (summaryBudget) +
                     complete() → SummarizeResult
     chunker.ts      нарезка транскрипта по главам под бюджет + stripAdChapters
@@ -172,6 +177,13 @@ src/
   обрывается. Ловится `bot.hears(PICK_COMMAND_RE)`, а не `bot.command` (имена динамические),
   до `bot.on('message:text')`. В реестр `COMMANDS` эти команды не входят. В шапке списка
   нет голых `/sum`: Telegram подсветит, а бот не поймёт.
+- **Файлы — только форматы без новых зависимостей** (решение владельца: остальное перебор).
+  Новый формат = запись в `BY_EXTENSION` + ветка в `readDocument` + тест; `/help` возьмёт
+  список сам (`supportedExtensions`). Ссылка на скачивание содержит **токен бота** — в текст
+  `DocumentError` её не кладём. Сообщение с файлом — не `message:text`, команды и `onLink`
+  его не видят; GIF приходит и как `document` — `onDocument` пропускает `animation`.
+  FB2 и субтитры разбираются регэкспами, сущности раскодируются **последними** (иначе
+  `&lt;` после раскодирования примут за тег и вырежут).
 - **Тест модуля, который тянет `config` (напрямую или через `logger`)**, задаёт env в
   `before()` и импортирует модуль динамически (см. `summarizer.test.ts`): статический импорт
   без `.env` роняет весь файл, а хук гоняет `npm run check` и там, где `.env` нет.
@@ -200,6 +212,10 @@ fallback-модель + повтор по 429, очередь `MAX_CONCURRENCY`,
 Команды бота подсказываются сами (Этап 6): реестр в `commands.ts` → меню Telegram
 (`setMyCommands`) + `/help`. Пересказ получил явное имя `/summary`, `/start` ужался до
 приветствия. Текст со ссылкой без команды по-прежнему идёт в пересказ.
+
+Готов **пересказ присланного файла** (Этап 8): `.md/.txt/.rst/.org/.adoc`, `.html`, `.srt/.vtt`,
+`.fb2` → тот же пересказ, что по ссылке. PDF/DOCX/EPUB сознательно не делали (нужны зависимости).
+Хендлер проверен smoke-прогоном с фейковым ctx и локальным LLM; в живом Telegram — за владельцем.
 
 Готова команда **`/search`** (Этап 7): поиск на YouTube через InnerTube → 5 вариантов
 со ссылками и командами `/sum_…` / `/art_…` → пересказ или статья. Проверено на живом
