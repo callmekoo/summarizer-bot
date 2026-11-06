@@ -1,6 +1,10 @@
+import type OpenAI from 'openai';
 import { llm } from './client.js';
 import { config } from '../config.js';
 import { logger } from '../lib/logger.js';
+import { currentRequest } from '../lib/requestContext.js';
+import { getDb } from '../lib/store.js';
+import { recordLlmCall } from '../db/usage.js';
 
 export type SummarizeErrorKind = 'unavailable' | 'rate_limited' | 'failed';
 
@@ -18,6 +22,8 @@ export interface TokenUsage {
   prompt: number;
   completion: number;
   total: number;
+  /** Стоимость в $, если провайдер её сообщил (OpenRouter: usage.cost); иначе null. */
+  costUsd: number | null;
 }
 
 export interface ChatMessage {
@@ -48,6 +54,11 @@ export async function complete(
   const models = [config.MODEL, config.MODEL_FALLBACK].filter(
     (m): m is string => Boolean(m),
   );
+  // OpenRouter по этому флагу кладёт стоимость в usage.cost. Другим провайдерам поле не
+  // шлём: строгие (OpenAI) отбивают незнакомые параметры.
+  const extra = isOpenRouter(config.LLM_BASE_URL)
+    ? { usage: { include: true } }
+    : {};
 
   for (let attempt = 0; ; attempt++) {
     let lastErr: unknown;
@@ -62,10 +73,14 @@ export async function complete(
           model,
           temperature: config.LLM_TEMPERATURE,
           messages,
-        });
+          ...extra,
+        } as OpenAI.ChatCompletionCreateParamsNonStreaming);
+        const usage = mapUsage(resp.usage);
+        // Платный вызов записываем, даже если ответ пустой: деньги уже потрачены.
+        recordCall(model, usage);
         const content = resp.choices[0]?.message?.content?.trim();
         if (content) {
-          return { text: content, model, usage: mapUsage(resp.usage) };
+          return { text: content, model, usage };
         }
         nOther++;
         logger.warn({ model }, 'пустой ответ модели, пробую следующую');
@@ -119,22 +134,59 @@ function httpStatus(err: unknown): number | undefined {
     : undefined;
 }
 
-/** Приводит usage из ответа провайдера к нашему виду (поля могут отсутствовать). */
-function mapUsage(
+/** Хост baseURL — openrouter.ai или его поддомен. */
+export function isOpenRouter(baseUrl: string): boolean {
+  try {
+    const host = new URL(baseUrl).hostname;
+    return host === 'openrouter.ai' || host.endsWith('.openrouter.ai');
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Приводит usage из ответа провайдера к нашему виду (поля могут отсутствовать). Стоимость
+ * берём, только если это конечное неотрицательное число — формат ответа чужой.
+ */
+export function mapUsage(
   usage:
     | {
         prompt_tokens?: number;
         completion_tokens?: number;
         total_tokens?: number;
+        cost?: unknown;
       }
     | undefined,
 ): TokenUsage | undefined {
   if (!usage) return undefined;
+  const cost = usage.cost;
   return {
     prompt: usage.prompt_tokens ?? 0,
     completion: usage.completion_tokens ?? 0,
     total: usage.total_tokens ?? 0,
+    costUsd:
+      typeof cost === 'number' && Number.isFinite(cost) && cost >= 0
+        ? cost
+        : null,
   };
+}
+
+/** Пишет вызов в статистику текущего запроса. Сбой записи не ломает ответ — только warn. */
+function recordCall(model: string, usage: TokenUsage | undefined): void {
+  const rc = currentRequest();
+  if (rc?.requestId == null) return;
+  try {
+    recordLlmCall(getDb(), {
+      requestId: rc.requestId,
+      model,
+      promptTokens: usage?.prompt ?? 0,
+      completionTokens: usage?.completion ?? 0,
+      costUsd: usage?.costUsd ?? null,
+      now: Date.now(),
+    });
+  } catch (err) {
+    logger.warn({ err, model }, 'статистика: не удалось записать вызов LLM');
+  }
 }
 
 /** Достаёт паузу до повтора из 429: сперва metadata, потом заголовок Retry-After. */
