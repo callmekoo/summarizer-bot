@@ -6,6 +6,7 @@ import { onStart } from './handlers/onStart.js';
 import { onHelp } from './handlers/onHelp.js';
 import { onLink } from './handlers/onLink.js';
 import { onArticle } from './handlers/onArticle.js';
+import { onDocument } from './handlers/onDocument.js';
 import { onSearch, onSearchCommand } from './handlers/onSearch.js';
 import { PICK_COMMAND_RE } from './core/youtubeSearch.js';
 import { COMMANDS } from './commands.js';
@@ -35,6 +36,8 @@ bot.command('start', onStart);
 bot.hears(PICK_COMMAND_RE, onSearchCommand);
 // Ссылка без команды — тоже пересказ.
 bot.on('message:text', onLink);
+// Присланный файл (.md, .txt, .html, …) — пересказ, как у веб-страницы.
+bot.on('message:document', onDocument);
 
 bot.catch((err) => {
   logger.error({ err: err.error }, 'необработанная ошибка бота');

@@ -7,7 +7,7 @@ import {
   splitForTelegram,
   renderSourceHeader,
 } from '../core/formatter.js';
-import type { ExtractResult } from '../types.js';
+import { DocumentError, supportedExtensions } from '../core/document.js';
 import { createLimiter } from '../lib/concurrency.js';
 import { replyTo } from '../lib/reply.js';
 import { config } from '../config.js';
@@ -31,18 +31,67 @@ export async function onLink(ctx: Context): Promise<void> {
   await runSummary(ctx, url, ctx.message?.message_id);
 }
 
+/** Откуда берётся текст для пересказа: ссылка или присланный файл. */
+export interface SummarySource {
+  /** Статус, пока идёт обработка. */
+  status: string;
+  /** Поля строки метрик `request`, по которым видно источник: `{ url }`, `{ file, … }`. */
+  log: Record<string, unknown>;
+  /** Достаёт текст и готовит шапку. Выполняется внутри общей очереди. */
+  load: () => Promise<LoadedSource>;
+}
+
+export interface LoadedSource {
+  markdown: string;
+  /** Заголовок для промпта. */
+  title?: string;
+  /** Готовая HTML-шапка над пересказом ('' — без шапки). */
+  header: string;
+}
+
 /**
- * Пересказ по готовой ссылке: извлечение → LLM → сообщения в чат + строка метрик.
- * Общий путь для ссылки в сообщении и для команды `/sum_<id>` из списка /search;
- * результат приходит ответом на replyToMessageId.
+ * Пересказ по готовой ссылке. Общий путь для ссылки в сообщении и для команды
+ * `/sum_<id>` из списка /search; результат приходит ответом на replyToMessageId.
  */
 export async function runSummary(
   ctx: Context,
   url: string,
   replyToMessageId: number | undefined,
 ): Promise<void> {
-  const status = await ctx.reply('⏳ Обрабатываю ссылку…');
-  // Держим индикатор «печатает», пока идёт парсинг + запрос к LLM.
+  await summarizeSource(
+    ctx,
+    {
+      status: '⏳ Обрабатываю ссылку…',
+      log: { url },
+      load: async () => {
+        const extracted = await extract(url);
+        return {
+          markdown: extracted.markdown,
+          title: extracted.title,
+          header: renderSourceHeader({
+            url,
+            title: extracted.title,
+            author: extracted.author,
+            site: extracted.site,
+          }),
+        };
+      },
+    },
+    replyToMessageId,
+  );
+}
+
+/**
+ * Пересказ любого источника: загрузка → LLM → сообщения в чат + строка метрик. Очередь,
+ * статус, «печатает», цепочка ответов и тексты ошибок — общие для ссылок и файлов.
+ */
+export async function summarizeSource(
+  ctx: Context,
+  source: SummarySource,
+  replyToMessageId: number | undefined,
+): Promise<void> {
+  const status = await ctx.reply(source.status);
+  // Держим индикатор «печатает», пока идёт загрузка + запрос к LLM.
   const typing = setInterval(() => {
     ctx.replyWithChatAction('typing').catch(() => {});
   }, 4000);
@@ -52,33 +101,26 @@ export async function runSummary(
   let parseMs = 0;
   let llmMs = 0;
 
-  let extracted: ExtractResult | undefined;
   try {
     await ctx.replyWithChatAction('typing');
-    const result = await pipeline.run(async () => {
+    const { result, header } = await pipeline.run(async () => {
       const tParse = Date.now();
-      extracted = await extract(url);
+      const loaded = await source.load();
       parseMs = Date.now() - tParse;
 
       const tLlm = Date.now();
-      const summary = await summarize(extracted.markdown, extracted.title);
+      const summary = await summarize(loaded.markdown, loaded.title);
       llmMs = Date.now() - tLlm;
-      return summary;
+      return { result: summary, header: loaded.header };
     });
 
-    const header = renderSourceHeader({
-      url,
-      title: extracted?.title,
-      author: extracted?.author,
-      site: extracted?.site,
-    });
     const notice = result.truncated
       ? `⚠️ Текст очень длинный — в пересказ вошли первые ~${result.keptPercent}%.`
       : '';
     const body = toTelegramHtml(result.text);
     const message = [header, notice, body].filter(Boolean).join('\n\n');
 
-    // Части выстраиваем цепочкой: первая отвечает на ссылку, каждая следующая — на
+    // Части выстраиваем цепочкой: первая отвечает на исходное сообщение, каждая следующая — на
     // предыдущую. Так пересказ читается по порядку, даже если чат уехал далеко вперёд.
     let replyToId = replyToMessageId;
     for (const chunk of splitForTelegram(message)) {
@@ -93,7 +135,7 @@ export async function runSummary(
     // Метрики: одна строка на успешный запрос.
     logger.info(
       {
-        url,
+        ...source.log,
         ok: true,
         model: result.model,
         parseMs,
@@ -116,7 +158,7 @@ export async function runSummary(
     logger.error(
       {
         err,
-        url,
+        ...source.log,
         ok: false,
         reason: errorReason(err),
         parseMs,
@@ -137,11 +179,27 @@ export async function runSummary(
 /** Короткий машиночитаемый код причины для метрик. */
 function errorReason(err: unknown): string {
   if (err instanceof ExtractError) return `extract_${err.kind}`;
+  if (err instanceof DocumentError) return `document_${err.kind}`;
   if (err instanceof SummarizeError) return `llm_${err.kind}`;
   return 'unknown';
 }
 
-function userMessageForError(err: unknown): string {
+/** Понятный текст ошибки для чата — без стек-трейсов. Нужен и хендлеру файлов. */
+export function userMessageForError(err: unknown): string {
+  if (err instanceof DocumentError) {
+    switch (err.kind) {
+      case 'unsupported':
+        return `📎 Такие файлы я не читаю. Пересказываю текстовые документы: ${supportedExtensions()}.`;
+      case 'too_large':
+        return '📦 Файл слишком большой для пересказа.';
+      case 'encoding':
+        return '😕 Не получается прочитать файл как текст — похоже, он не текстовый.';
+      case 'empty':
+        return '😕 В файле не нашлось текста для пересказа.';
+      default:
+        return '⚠️ Не удалось скачать файл из Telegram. Попробуй ещё раз.';
+    }
+  }
   if (err instanceof ExtractError) {
     switch (err.kind) {
       case 'empty':

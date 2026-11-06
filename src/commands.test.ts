@@ -69,3 +69,10 @@ test('renderHelp экранирует placeholder аргумента', () => {
   assert.ok(help.includes('&lt;ссылка&gt;'), 'угловые скобки экранированы');
   assert.ok(!/<ссылка>/.test(help), 'сырых угловых скобок в справке нет');
 });
+
+test('renderHelp рассказывает про пересказ файлов', () => {
+  const help = renderHelp();
+  for (const ext of ['.md', '.html', '.srt', '.fb2']) {
+    assert.ok(help.includes(ext), ext);
+  }
+});

@@ -11,26 +11,32 @@ function escapeAttr(s: string): string {
 }
 
 export interface SourceMeta {
-  url: string;
+  /** Нет у присланного файла — тогда заголовок без ссылки. */
+  url?: string;
+  /** Имя присланного файла: строка «📄 …» вместо сайта. */
+  file?: string;
   title?: string;
   author?: string;
   site?: string;
 }
 
 /**
- * Шапка с источником над пересказом: кликабельный заголовок-ссылка, затем сайт и автор.
+ * Шапка с источником над пересказом: заголовок (ссылкой, если есть url), затем файл,
+ * сайт и автор.
  * Возвращает '' если выводить нечего. Все поля экранируются.
  */
 export function renderSourceHeader(meta: SourceMeta): string {
   const lines: string[] = [];
 
   if (meta.title) {
+    const title = `<b>${escapeHtml(meta.title)}</b>`;
     lines.push(
-      `<a href="${escapeAttr(meta.url)}"><b>${escapeHtml(meta.title)}</b></a>`,
+      meta.url ? `<a href="${escapeAttr(meta.url)}">${title}</a>` : title,
     );
   }
 
   const sub: string[] = [];
+  if (meta.file) sub.push(`📄 ${escapeHtml(meta.file)}`);
   if (meta.site) sub.push(`🌐 ${escapeHtml(meta.site)}`);
   if (meta.author) sub.push(`✍️ ${escapeHtml(meta.author)}`);
   if (sub.length) lines.push(sub.join(' · '));
