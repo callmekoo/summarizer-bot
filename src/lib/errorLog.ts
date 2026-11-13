@@ -26,9 +26,9 @@ export function serializeError(err: unknown): Record<string, unknown> {
 }
 
 function scrub(value: unknown, depth: number): unknown {
-  if (depth > MAX_DEPTH || value === null || typeof value !== 'object') {
-    return value;
-  }
+  if (value === null || typeof value !== 'object') return value;
+  // Глубже предела не разбираем — и не пропускаем как есть: там тоже может быть payload.
+  if (depth > MAX_DEPTH) return '[обрезано]';
   if (Array.isArray(value)) return value.map((v) => scrub(v, depth + 1));
   const out: Record<string, unknown> = {};
   for (const [key, v] of Object.entries(value)) {

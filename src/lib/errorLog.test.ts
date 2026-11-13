@@ -52,3 +52,13 @@ test('не-Error проходит без падений', () => {
   assert.doesNotThrow(() => serializeError('строка'));
   assert.doesNotThrow(() => serializeError(undefined));
 });
+
+test('глубже предела вложенности payload всё равно не утекает', () => {
+  // error → response → body → … : payload на 10-м уровне.
+  let nested: Record<string, unknown> = { payload: { text: SECRET } };
+  for (let i = 0; i < 10; i++) nested = { level: nested };
+  const err = Object.assign(new Error('deep'), { error: nested });
+  const json = JSON.stringify(serializeError(err));
+  assert.ok(!json.includes('secret-article'), json);
+  assert.ok(json.includes('[обрезано]'), json);
+});
