@@ -47,7 +47,10 @@ export function getUser(db: Db, id: number): UserRow | undefined {
  * `findUser('@ник')` находил актуального владельца.
  */
 export function touchProfile(db: Db, p: TgProfile): UserRow | undefined {
-  if (!getUser(db, p.id)) return undefined;
+  const current = getUser(db, p.id);
+  if (!current) return undefined;
+  // Вызывается на каждый апдейт и до rate-limit: без изменений в базу не пишем.
+  if (sameProfile(current, p)) return current;
   releaseUsername(db, p);
   db.prepare(
     'UPDATE users SET username = ?, first_name = ?, last_name = ? WHERE id = ?',
@@ -60,6 +63,8 @@ export function touchProfile(db: Db, p: TgProfile): UserRow | undefined {
  * `/stats @свой_ник` его находил. Статус всегда approved (проверку доступа он не проходит).
  */
 export function touchAdmin(db: Db, p: TgProfile, now: number): void {
+  const current = getUser(db, p.id);
+  if (current?.status === 'approved' && sameProfile(current, p)) return;
   releaseUsername(db, p);
   db.prepare(
     `INSERT INTO users (id, username, first_name, last_name, status, decided_at)
@@ -157,6 +162,14 @@ export function findUser(db: Db, query: string): UserRow | undefined {
     .prepare('SELECT * FROM users WHERE lower(username) = lower(?)')
     .get(nick);
   return r ? rowToUser(r as unknown as Row) : undefined;
+}
+
+function sameProfile(u: UserRow, p: TgProfile): boolean {
+  return (
+    u.username === (p.username ?? null) &&
+    u.firstName === (p.first_name ?? null) &&
+    u.lastName === (p.last_name ?? null)
+  );
 }
 
 function releaseUsername(db: Db, p: TgProfile): void {

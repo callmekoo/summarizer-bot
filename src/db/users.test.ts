@@ -9,6 +9,7 @@ import {
   seedApproved,
   listUsers,
   findUser,
+  touchAdmin,
 } from './users.js';
 
 const NOW = Date.UTC(2026, 10, 6, 12);
@@ -121,4 +122,25 @@ test('seedApproved одобряет ждущую заявку', () => {
   createApplication(db, { id: 1 }, NOW);
   seedApproved(db, [1], NOW);
   assert.equal(getUser(db, 1)?.status, 'approved');
+});
+
+/** Сколько строк изменено с открытия базы (INSERT/UPDATE/DELETE). */
+const writes = () =>
+  (db.prepare('SELECT total_changes() AS n').get() as { n: number }).n;
+
+test('touchProfile без изменений профиля не пишет в базу', () => {
+  createApplication(db, { id: 1, username: 'ivanp', first_name: 'Иван' }, NOW);
+  const before = writes();
+  const u = touchProfile(db, { id: 1, username: 'ivanp', first_name: 'Иван' });
+  assert.equal(u?.username, 'ivanp');
+  assert.equal(writes(), before);
+});
+
+test('touchAdmin без изменений профиля не пишет в базу', () => {
+  touchAdmin(db, { id: 1, username: 'owner', first_name: 'Я' }, NOW);
+  const before = writes();
+  touchAdmin(db, { id: 1, username: 'owner', first_name: 'Я' }, NOW + 1);
+  assert.equal(writes(), before);
+  touchAdmin(db, { id: 1, username: 'owner2', first_name: 'Я' }, NOW + 2);
+  assert.equal(getUser(db, 1)?.username, 'owner2');
 });
