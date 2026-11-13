@@ -164,6 +164,64 @@ docker compose up -d              # перезапустить на новом �
 авто-перезапускать «зависший» (unhealthy) контейнер — раскомментируй сервис `autoheal`
 в [docker-compose.yml](docker-compose.yml).
 
+## Podman (вместо Docker)
+
+Образ обычный OCI — Podman его запускает. Вместо compose удобнее **quadlet** (Podman ≥ 4.4):
+два файла в [deploy/podman/](deploy/podman/), а запуск, перезапуск при падении, подъём
+после перезагрузки и логи берёт на себя systemd. Без root, от своего пользователя.
+
+```sh
+mkdir -p ~/.config/containers/systemd ~/summarizer
+cp deploy/podman/summarizer-bot.container deploy/podman/summarizer-bot-data.volume ~/.config/containers/systemd/
+cp .env.example ~/summarizer/.env   # заполнить: BOT_TOKEN, LLM_API_KEY, MODEL, ADMIN_USER_ID, TZ
+```
+
+```sh
+systemctl --user daemon-reload
+systemctl --user start summarizer-bot
+loginctl enable-linger "$USER"      # чтобы бот жил без входа в систему и после перезагрузки
+```
+
+`.env` для Podman — строки `KEY=VALUE` **без кавычек** (кавычки попадут в значение).
+
+Управление:
+
+```sh
+systemctl --user status summarizer-bot      # статус
+journalctl --user -u summarizer-bot -f      # логи
+podman healthcheck run summarizer-bot       # healthcheck вручную (0 — здоров)
+podman auto-update                          # подтянуть свежий :latest и перезапустить
+```
+
+Для автообновления по расписанию: `systemctl --user enable --now podman-auto-update.timer`.
+
+Чем отличается от `docker-compose.yml`:
+
+- **autoheal не нужен**: «зависший» бот (healthcheck падает) убивается
+  (`HealthOnFailure=kill`), systemd поднимает его заново (`Restart=always`).
+- **Healthcheck задан в юните явно** (`HealthCmd=…`), а не берётся из образа: Podman видит
+  `HEALTHCHECK` не во всех форматах образа (в собранном им самим OCI-образе его нет).
+  Команда и интервалы — те же, что в `Dockerfile`; меняешь там — меняй и тут.
+- **Бэкап базы** — те же команды, что для Docker, через `podman`:
+
+```sh
+podman exec summarizer-bot node --no-warnings -e "new (require('node:sqlite').DatabaseSync)('data/bot.db').exec(\"VACUUM INTO 'data/backup.db'\")"
+```
+
+```sh
+podman cp summarizer-bot:/app/data/backup.db ./bot-backup.db
+```
+
+```sh
+podman exec summarizer-bot rm data/backup.db
+```
+
+Что проверено (Podman 4.9.3): генератор quadlet принимает оба файла без ошибок; образ
+собирается из нашего `Dockerfile` без правок; в именованном томе бот создаёт базу от
+пользователя `node` без ручного `chown`; healthcheck из юнита отличает живого бота от
+зависшего; команды бэкапа работают. **Не проверено**: запуск самого юнита через systemd и
+работа с настоящим Telegram — сделай `systemctl --user status` после первого старта.
+
 ## Переменные окружения
 
 | Переменная | Назначение | По умолчанию |

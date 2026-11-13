@@ -184,6 +184,9 @@ src/
   реестре `commands.ts` — с `admin: true`: в `/help` их нет, меню владельцу ставится
   отдельно (`setMyCommands` со `scope: chat`). Кнопки заявки работают только по `pending`
   (`onlyIfPending`) — старая кнопка не перебьёт решение командой.
+- **Healthcheck описан дважды**: `HEALTHCHECK` в `Dockerfile` и `HealthCmd=` в
+  `deploy/podman/summarizer-bot.container` (Podman не видит `HEALTHCHECK` в OCI-образах).
+  Меняешь команду или интервалы — меняй в обоих местах.
 - **`node:sqlite` грузится динамически** (`openDatabase`): статический импорт печатает
   ExperimentalWarning раньше любого нашего кода, а так мы глушим ровно его. В тестах и коде
   импортируй из `node:sqlite` только типы (`import type`).
@@ -255,7 +258,8 @@ src/
 Готовы Этапы 0–3 и бо́льшая часть Этапа 4: happy path, устойчивость (ретраи rdrr,
 fallback-модель + повтор по 429, очередь `MAX_CONCURRENCY`, rate-limit),
 шапка источника, метрики (строка `request`), Docker + compose + heartbeat-healthcheck.
-Развёрнут на GitHub: `callmekoo/summarizer-bot`. Образ собирает CI
+Развёрнут на GitHub: `callmekoo/summarizer-bot`. Для Podman — quadlet-юнит в
+`deploy/podman/` (вместо compose; см. README «Podman»). Образ собирает CI
 (`.github/workflows/docker.yml`) и пушит в GHCR (`ghcr.io/callmekoo/summarizer-bot`);
 на сервере — `docker compose pull` (сборку с слабого VPS убрали, там `tsc` шёл минутами).
 
