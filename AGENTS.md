@@ -24,7 +24,7 @@ npm run dev
 
 ## Стек
 
-- **TypeScript / Node.js 22.12+**, ESM (`"type": "module"`, `module: NodeNext`).
+- **TypeScript / Node.js 22.13+** (`node:sqlite` без флага), ESM (`"type": "module"`, `module: NodeNext`).
 - **grammY** — телеграм-бот. **rdrr** — извлечение текста (как библиотека).
 - **LLM** — любой OpenAI-совместимый API через `openai` SDK; провайдер задаётся
   `LLM_BASE_URL` + `LLM_API_KEY` (дефолт — OpenRouter).
