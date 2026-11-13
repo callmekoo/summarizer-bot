@@ -35,16 +35,29 @@ beforeEach(async () => {
   notifyFails = false;
 });
 
-/** Прогоняет один апдейт через middleware; возвращает ответы и признак next(). */
+/**
+ * Прогоняет один апдейт через middleware; возвращает ответы и признак next().
+ * kind: обычное сообщение (по умолчанию), нажатие кнопки или служебное событие
+ * (my_chat_member — человек заблокировал/разблокировал бота).
+ */
 async function send(
   from: { id: number; username?: string; first_name?: string } | undefined,
   now = NOW,
+  opts: {
+    kind?: 'message' | 'callback' | 'service';
+    replyFails?: boolean;
+  } = {},
 ) {
+  const kind = opts.kind ?? 'message';
   const replies: string[] = [];
   let passed = false;
   const ctx = {
     from,
+    message: kind === 'message' ? { text: 'привет' } : undefined,
+    callbackQuery: kind === 'callback' ? { data: 'x' } : undefined,
+    myChatMember: kind === 'service' ? { new_chat_member: {} } : undefined,
     reply: async (text: string) => {
+      if (opts.replyFails) throw new Error('403: bot was blocked by the user');
       replies.push(text);
     },
     answerCallbackQuery: async () => {},
@@ -155,4 +168,51 @@ test('текст заявки: имя, ник, id; HTML экранирован',
     retryAfter: null,
   });
   assert.equal(text, 'Новая заявка: без ника (&lt;Иван&gt;, id 5)');
+});
+
+test('служебное событие от незнакомца не создаёт заявку и не отвечает', async () => {
+  const r = await send({ id: 5 }, NOW, { kind: 'service' });
+  assert.equal(r.passed, false);
+  assert.deepEqual(r.replies, []);
+  assert.equal(getUser(db, 5), undefined);
+  assert.equal(notified.length, 0);
+});
+
+test('блокировка бота отклонённым после кулдауна — не новая заявка', async () => {
+  createApplication(db, { id: 5 }, NOW);
+  setStatus(db, 5, 'rejected', NOW, NOW + DAY);
+  const r = await send({ id: 5 }, NOW + 2 * DAY, { kind: 'service' });
+  assert.deepEqual(r.replies, []);
+  assert.equal(getUser(db, 5)?.status, 'rejected');
+  assert.equal(notified.length, 0);
+});
+
+test('служебное событие от ждущего — без ответа «на рассмотрении»', async () => {
+  createApplication(db, { id: 5 }, NOW);
+  const r = await send({ id: 5 }, NOW, { kind: 'service' });
+  assert.deepEqual(r.replies, []);
+  assert.equal(r.passed, false);
+});
+
+test('служебное событие одобренного проходит дальше, как раньше', async () => {
+  createApplication(db, { id: 5 }, NOW);
+  setStatus(db, 5, 'approved', NOW);
+  assert.equal((await send({ id: 5 }, NOW, { kind: 'service' })).passed, true);
+});
+
+test('ответ человеку не ушёл — владелец всё равно получает заявку', async () => {
+  await send({ id: 5 }, NOW, { replyFails: true });
+  assert.equal(getUser(db, 5)?.status, 'pending');
+  assert.equal(notified.length, 1);
+});
+
+test('ответ «на рассмотрении» не ушёл — без исключения наружу', async () => {
+  createApplication(db, { id: 5 }, NOW);
+  await assert.doesNotReject(send({ id: 5 }, NOW, { replyFails: true }));
+});
+
+test('кнопка от незнакомца — заявка, как от сообщения', async () => {
+  const r = await send({ id: 5 }, NOW, { kind: 'callback' });
+  assert.deepEqual(r.replies, [ACCESS_TEXT.applied]);
+  assert.equal(notified.length, 1);
 });

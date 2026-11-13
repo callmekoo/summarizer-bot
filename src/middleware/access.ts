@@ -59,9 +59,17 @@ export function createAccess(
     }
 
     const decision = decideAccess(user, false, now);
+    if (decision.kind === 'pass') return next();
+
+    // Неодобренным отвечаем только на то, что человек сделал сам: сообщение или кнопку.
+    // Служебные события (my_chat_member — заблокировал/разблокировал бота) молча
+    // пропускаем: иначе блокировка после кулдауна заводила бы заявку, а ответ на неё
+    // падал бы с «бот заблокирован».
+    if (!ctx.message && !ctx.callbackQuery) return;
+    // Нажатую кнопку закрываем, чтобы не крутился индикатор.
+    if (ctx.callbackQuery) await ctx.answerCallbackQuery().catch(() => {});
+
     switch (decision.kind) {
-      case 'pass':
-        return next();
       case 'apply': {
         let created: UserRow;
         try {
@@ -69,7 +77,8 @@ export function createAccess(
         } catch (err) {
           return failClosed(ctx, err, from.id);
         }
-        await ctx.reply(ACCESS_TEXT.applied);
+        // Ответ человеку может не уйти — владелец о заявке узнать всё равно должен.
+        await safeReply(ctx, ACCESS_TEXT.applied);
         logger.info({ userId: from.id }, 'доступ: новая заявка');
         try {
           await deps.notifyAdmin(created);
@@ -84,17 +93,24 @@ export function createAccess(
         return;
       }
       case 'pending':
-        await ctx.reply(ACCESS_TEXT.pending);
+        await safeReply(ctx, ACCESS_TEXT.pending);
         return;
       case 'rejected':
-        await ctx.reply(ACCESS_TEXT.rejected(decision.until));
+        await safeReply(ctx, ACCESS_TEXT.rejected(decision.until));
         return;
       case 'ignore':
-        // Бан: молчим. Нажатую кнопку всё же закрываем, чтобы не крутился индикатор.
-        if (ctx.callbackQuery) await ctx.answerCallbackQuery().catch(() => {});
-        return;
+        return; // бан: молчим
     }
   };
+}
+
+/** Ответ неодобренному. Не ушёл (например, бот заблокирован) — не повод падать. */
+async function safeReply(ctx: Context, text: string): Promise<void> {
+  try {
+    await ctx.reply(text);
+  } catch (err) {
+    logger.debug({ err, userId: ctx.from?.id }, 'доступ: ответ не доставлен');
+  }
 }
 
 /** Ошибка базы при проверке доступа: не пускаем, без проверки тратить деньги нельзя. */
