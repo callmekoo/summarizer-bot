@@ -65,10 +65,20 @@ async function send(
   return { replies, passed };
 }
 
-test('админ проходит без строки в базе', async () => {
-  const r = await send({ id: ADMIN });
+test('админ проходит, и бот запоминает его ник и имя (для /stats)', async () => {
+  const r = await send({ id: ADMIN, username: 'owner', first_name: 'Хозяин' });
   assert.equal(r.passed, true);
-  assert.equal(getUser(db, ADMIN), undefined);
+  const row = getUser(db, ADMIN);
+  assert.equal(row?.status, 'approved');
+  assert.equal(row?.username, 'owner');
+  assert.equal(row?.firstName, 'Хозяин');
+});
+
+test('админ проходит, даже если база недоступна', async () => {
+  db.close();
+  const r = await send({ id: ADMIN, username: 'owner' });
+  assert.equal(r.passed, true);
+  assert.deepEqual(r.replies, []);
 });
 
 test('апдейт без from игнорируется', async () => {
@@ -144,5 +154,5 @@ test('текст заявки: имя, ник, id; HTML экранирован',
     decidedAt: null,
     retryAfter: null,
   });
-  assert.equal(text, 'Новая заявка: &lt;Иван&gt; (без ника), id 5');
+  assert.equal(text, 'Новая заявка: без ника (&lt;Иван&gt;, id 5)');
 });

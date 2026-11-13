@@ -1,5 +1,7 @@
-// Пользователь в нашей базе и его безопасное представление для владельца. Без зависимостей:
+// Пользователь в нашей базе и его безопасное представление для владельца. Без config:
 // тестируется без .env.
+
+import { escapeHtml } from './formatter.js';
 
 export type UserStatus = 'pending' | 'approved' | 'rejected' | 'banned';
 
@@ -52,6 +54,19 @@ export function displayName(
   return chars.length > MAX_NAME
     ? chars.slice(0, MAX_NAME - 1).join('') + '…'
     : cleaned;
+}
+
+/**
+ * Как владелец видит пользователя везде — в /stats, /users, заявках и ответах на команды:
+ * `@ivanp (Иван Петров, id 123)`. Ник — чтобы узнать, имя — если ника нет, id — для
+ * команд (/ban <id>) у тех, у кого нет ника. Telegram-HTML, экранирован.
+ */
+export function userLabelHtml(
+  user: Pick<UserRow, 'id' | 'username' | 'firstName' | 'lastName'>,
+): string {
+  return escapeHtml(
+    `${displayUsername(user.username)} (${displayName(user)}, id ${user.id})`,
+  );
 }
 
 /** Ник для показа: `@ivanp` или «без ника». */

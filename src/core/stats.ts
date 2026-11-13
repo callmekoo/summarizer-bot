@@ -1,5 +1,5 @@
 import { escapeHtml } from './formatter.js';
-import { displayName, displayUsername, type UserRow } from './users.js';
+import { userLabelHtml, type UserRow } from './users.js';
 import type { Totals, TopRow, RequestCommand } from '../db/usage.js';
 
 // Отчёты для владельца: /stats, /stats <user>, /users. Чистые функции → Telegram-HTML;
@@ -45,7 +45,7 @@ export function renderStats(
   lines.push('<b>Топ за 30 дней</b>');
   if (top.length === 0) lines.push('нет данных');
   top.forEach(({ row, user }, i) => {
-    const who = user ? userLabel(user) : `id ${row.userId}`;
+    const who = user ? userLabelHtml(user) : `id ${row.userId}`;
     const cost = row.costUsd > 0 ? `$${row.costUsd.toFixed(4)}` : '$0';
     lines.push(`${i + 1}. ${who} — ${cost}, ${row.requests} запр.`);
   });
@@ -62,8 +62,7 @@ export function renderUserStats(
     ? breakdown.map((b) => `${b.command} — ${b.requests}`).join(', ')
     : 'нет данных';
   return [
-    `<b>${escapeHtml(displayName(user))}</b> (${displayUsername(user.username)}), ` +
-      `id ${user.id} — ${STATUS_LABEL[user.status]}`,
+    `<b>${userLabelHtml(user)}</b> — ${STATUS_LABEL[user.status]}`,
     ...periods.map(periodLine),
     '',
     `По командам: ${commands}`,
@@ -81,8 +80,12 @@ export function renderUsers(users: UserRow[]): string {
       [
         `<b>${title}</b> (${group.length})`,
         ...group.map((u) => {
-          const date = u.decidedAt ?? u.requestedAt;
-          return `${userLabel(u)}, id ${u.id}${date ? `, ${formatDate(date)}` : ''}`;
+          // У ждущих — дата заявки (повторной — новой), у остальных — решения.
+          const date =
+            u.status === 'pending'
+              ? u.requestedAt
+              : (u.decidedAt ?? u.requestedAt);
+          return `${userLabelHtml(u)}${date ? `, ${formatDate(date)}` : ''}`;
         }),
       ].join('\n'),
     );
@@ -108,10 +111,6 @@ function periodLine({ label, totals: t }: PeriodTotals): string {
   const errors = t.errors > 0 ? ` (${t.errors} ошиб.)` : '';
   const tokens = (t.promptTokens + t.completionTokens).toLocaleString('ru-RU');
   return `<b>${escapeHtml(label)}</b>: ${t.requests} запр.${errors}, ${tokens} ток., ${formatCost(t)}`;
-}
-
-function userLabel(u: UserRow): string {
-  return `${escapeHtml(displayName(u))} (${displayUsername(u.username)})`;
 }
 
 function formatDate(ms: number): string {

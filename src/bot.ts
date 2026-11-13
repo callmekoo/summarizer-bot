@@ -34,6 +34,9 @@ import type { Db } from './db/database.js';
 let db: Db;
 try {
   db = await initStore();
+  // Тут же, под тем же понятным сообщением: SQLITE_BUSY (файл держит другой процесс) или
+  // запись в недоступный каталог иначе уронили бы старт сырым стектрейсом.
+  seedApproved(db, config.ALLOWED_USER_IDS, Date.now());
 } catch (err) {
   logger.fatal(
     { err, path: config.DB_PATH },
@@ -41,7 +44,6 @@ try {
   );
   process.exit(1);
 }
-seedApproved(db, config.ALLOWED_USER_IDS, Date.now());
 logger.info(
   { admin: config.ADMIN_USER_ID, preapproved: config.ALLOWED_USER_IDS.length },
   'доступ по заявкам включён',

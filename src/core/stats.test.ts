@@ -96,8 +96,9 @@ test('строка периода и топ', () => {
   ]);
   assert.ok(text.includes('<b>Сегодня</b>: 3 запр. (1 ошиб.)'));
   assert.ok(text.includes('$0.0030'));
-  assert.ok(text.includes('1. Иван (@ivanp) — $0.0030, 5 запр.'));
-  assert.ok(text.includes('id 6'));
+  assert.ok(text.includes('1. @ivanp (Иван, id 5) — $0.0030, 5 запр.'));
+  // Пользователя нет в базе (старые данные) — хотя бы id.
+  assert.ok(text.includes('2. id 6 — $0, 1 запр.'));
 });
 
 test('имена экранируются', () => {
@@ -117,7 +118,29 @@ test('renderUsers: группы и пустой список', () => {
   assert.ok(text.includes('Ждут'));
   assert.ok(text.includes('Забанены'));
   assert.ok(!text.includes('Отклонены'));
-  assert.ok(text.includes('Иван (без ника), id 1, 01.11.2026'));
+  assert.ok(text.includes('без ника (Иван, id 1), 01.11.2026'));
+});
+
+test('renderUsers: у повторной заявки — дата заявки, а не старого отказа', () => {
+  const text = renderUsers([
+    user(1, {
+      status: 'pending',
+      decidedAt: Date.UTC(2026, 9, 1, 12), // старый отказ
+      requestedAt: Date.UTC(2026, 10, 10, 12), // новая заявка
+    }),
+  ]);
+  assert.ok(text.includes('10.11.2026'), text);
+  assert.ok(!text.includes('01.10.2026'), text);
+});
+
+test('renderUserStats: заголовок в формате @ник (Имя, id)', () => {
+  const text = renderUserStats(
+    user(5, { username: 'ivanp' }),
+    periods(ZERO),
+    [],
+    null,
+  );
+  assert.ok(text.startsWith('<b>@ivanp (Иван, id 5)</b> — одобрен'), text);
 });
 
 test('renderUserStats без запросов', () => {

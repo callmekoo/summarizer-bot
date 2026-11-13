@@ -55,6 +55,29 @@ export function touchProfile(db: Db, p: TgProfile): UserRow | undefined {
   return getUser(db, p.id);
 }
 
+/**
+ * Владелец: держим его профиль в базе, чтобы в /stats он был виден по нику, а
+ * `/stats @свой_ник` его находил. Статус всегда approved (проверку доступа он не проходит).
+ */
+export function touchAdmin(db: Db, p: TgProfile, now: number): void {
+  releaseUsername(db, p);
+  db.prepare(
+    `INSERT INTO users (id, username, first_name, last_name, status, decided_at)
+     VALUES (?, ?, ?, ?, 'approved', ?)
+     ON CONFLICT(id) DO UPDATE SET
+       username = excluded.username,
+       first_name = excluded.first_name,
+       last_name = excluded.last_name,
+       status = 'approved'`,
+  ).run(
+    p.id,
+    p.username ?? null,
+    p.first_name ?? null,
+    p.last_name ?? null,
+    now,
+  );
+}
+
 /** Новая (или повторная после отказа) заявка: статус pending, кулдаун сброшен. */
 export function createApplication(db: Db, p: TgProfile, now: number): UserRow {
   releaseUsername(db, p);

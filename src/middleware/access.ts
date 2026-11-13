@@ -1,9 +1,8 @@
 import { InlineKeyboard, type Context, type NextFunction } from 'grammy';
 import type { Db } from '../db/database.js';
-import { touchProfile, createApplication } from '../db/users.js';
+import { touchProfile, touchAdmin, createApplication } from '../db/users.js';
 import { decideAccess, ACCESS_TEXT } from '../core/access.js';
-import { displayName, displayUsername, type UserRow } from '../core/users.js';
-import { escapeHtml } from '../core/formatter.js';
+import { userLabelHtml, type UserRow } from '../core/users.js';
 import { config } from '../config.js';
 import { logger } from '../lib/logger.js';
 
@@ -23,14 +22,9 @@ export function isAdmin(ctx: Context): boolean {
   return ctx.from?.id === config.ADMIN_USER_ID;
 }
 
-/** `Иван Петров (@ivanp), id 123` — Telegram-HTML. */
-export function renderUserLine(user: UserRow): string {
-  return `${escapeHtml(displayName(user))} (${displayUsername(user.username)}), id ${user.id}`;
-}
-
-/** `Новая заявка: Иван Петров (@ivanp), id 123` — Telegram-HTML. */
+/** `Новая заявка: @ivanp (Иван Петров, id 123)` — Telegram-HTML. */
 export function renderApplication(user: UserRow): string {
-  return `Новая заявка: ${renderUserLine(user)}`;
+  return `Новая заявка: ${userLabelHtml(user)}`;
 }
 
 export function applicationKeyboard(userId: number): InlineKeyboard {
@@ -46,9 +40,17 @@ export function createAccess(
   return async (ctx, next) => {
     const from = ctx.from;
     if (!from) return; // каналы и прочие апдейты без отправителя
-    if (from.id === deps.adminId) return next();
-
     const now = deps.now();
+    if (from.id === deps.adminId) {
+      // Владелец проходит всегда; профиль — только чтобы видеть себя в /stats по нику.
+      try {
+        touchAdmin(deps.db, from, now);
+      } catch (err) {
+        logger.warn({ err }, 'доступ: не удалось обновить профиль владельца');
+      }
+      return next();
+    }
+
     let user: UserRow | undefined;
     try {
       user = touchProfile(deps.db, from);

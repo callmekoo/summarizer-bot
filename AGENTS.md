@@ -101,7 +101,8 @@ src/
     youtubeSearch.ts поиск через InnerTube, отсев эфиров/шортсов, список + команды.
                     Без config/logger — тесты и smoke-скрипт работают без .env
     access.ts       decideAccess(user, isAdmin, now) + тексты для пользователя
-    users.ts        UserRow, displayName (чистка имён для показа владельцу)
+    users.ts        UserRow, displayName (чистка имён), userLabelHtml — единый формат
+                    «@ник (Имя, id)» для заявок, /users, /stats и ответов на команды
     stats.ts        periodStarts, formatCost, renderStats/renderUserStats/renderUsers
   llm/
     client.ts       OpenAI-совместимый клиент
@@ -185,7 +186,8 @@ src/
   ExperimentalWarning раньше любого нашего кода, а так мы глушим ровно его. В тестах и коде
   импортируй из `node:sqlite` только типы (`import type`).
 - **Доступ fail closed:** ошибка базы в `access` → «Временная ошибка», дальше не пускаем.
-  Владелец (`ADMIN_USER_ID`) проходит всегда, даже без строки в базе.
+  Владелец (`ADMIN_USER_ID`) проходит всегда, даже без строки в базе; его профиль пишется
+  в `users` (`touchAdmin`, статус всегда approved) — ошибка записи лишь `warn`.
 - **Реклама в главах видео.** Авторы часто размечают рекламу отдельной главой («Реклама»).
   Мы передаём названия глав модели как основу для заголовков — то есть без фильтра сами
   приказываем ей сделать раздел «Реклама», и она слушается (реальный баг). Поэтому

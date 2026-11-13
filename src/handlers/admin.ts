@@ -8,7 +8,7 @@ import {
   lastRequestAt,
 } from '../db/usage.js';
 import { ACCESS_TEXT } from '../core/access.js';
-import type { UserRow, UserStatus } from '../core/users.js';
+import { userLabelHtml, type UserRow, type UserStatus } from '../core/users.js';
 import {
   periodStarts,
   renderStats,
@@ -17,7 +17,7 @@ import {
   type PeriodTotals,
 } from '../core/stats.js';
 import { splitForTelegram } from '../core/formatter.js';
-import { renderApplication, renderUserLine } from '../middleware/access.js';
+import { renderApplication } from '../middleware/access.js';
 import { GREETING } from './onStart.js';
 import { getDb } from '../lib/store.js';
 import { config } from '../config.js';
@@ -192,7 +192,7 @@ async function decideByCommand(
     return;
   }
   const note = r.notified || action === 'ban' ? '' : ' (уведомить не удалось)';
-  await ctx.reply(`${renderUserLine(r.user)} — ${DONE_LABEL[action]}${note}`, {
+  await ctx.reply(`${userLabelHtml(r.user)} — ${DONE_LABEL[action]}${note}`, {
     parse_mode: 'HTML',
   });
 }

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { displayName, displayUsername } from './users.js';
+import { displayName, displayUsername, userLabelHtml } from './users.js';
 
 const name = (firstName: string | null, lastName: string | null = null) =>
   displayName({ firstName, lastName });
@@ -41,4 +41,36 @@ test('составные эмодзи сохраняют ZWJ, одинокий Z
 test('ник: с @ или «без ника»', () => {
   assert.equal(displayUsername(null), 'без ника');
   assert.equal(displayUsername('ivanp'), '@ivanp');
+});
+
+const row = (over: Partial<Parameters<typeof userLabelHtml>[0]> = {}) => ({
+  id: 5,
+  username: 'ivanp' as string | null,
+  firstName: 'Иван' as string | null,
+  lastName: 'Петров' as string | null,
+  ...over,
+});
+
+test('метка пользователя: @ник (Имя, id)', () => {
+  assert.equal(userLabelHtml(row()), '@ivanp (Иван Петров, id 5)');
+});
+
+test('метка: без ника и без имени — явные заглушки', () => {
+  assert.equal(
+    userLabelHtml(row({ username: null })),
+    'без ника (Иван Петров, id 5)',
+  );
+  assert.equal(
+    userLabelHtml(row({ firstName: null, lastName: null })),
+    '@ivanp (без имени, id 5)',
+  );
+});
+
+test('метка экранирует HTML в имени и нике', () => {
+  assert.equal(
+    userLabelHtml(
+      row({ username: 'a<b', firstName: '<Иван>', lastName: null }),
+    ),
+    '@a&lt;b (&lt;Иван&gt;, id 5)',
+  );
 });
