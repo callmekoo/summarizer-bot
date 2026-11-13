@@ -11,8 +11,7 @@ import { runSummary, requestUser } from './onLink.js';
 import { runArticle } from './onArticle.js';
 import { replyTo } from '../lib/reply.js';
 import { logger } from '../lib/logger.js';
-import { withRequest } from '../lib/requestContext.js';
-import { sourceLogFields } from '../lib/privacy.js';
+import { withRequest, logSource } from '../lib/requestContext.js';
 import { getDb } from '../lib/store.js';
 
 /** `/search <запрос>` → список видео с YouTube; под каждым команды пересказа и статьи. */
@@ -29,7 +28,7 @@ export async function onSearch(ctx: Context): Promise<void> {
 
   const user = requestUser(ctx);
   await withRequest({ db: getDb(), now: Date.now }, user, 'search', () =>
-    searchTracked(ctx, query, replyId, user.isAdmin),
+    searchTracked(ctx, query, replyId),
   );
 }
 
@@ -38,7 +37,6 @@ async function searchTracked(
   ctx: Context,
   query: string,
   replyId: number | undefined,
-  isAdmin: boolean,
 ): Promise<boolean> {
   const startedAt = Date.now();
   try {
@@ -46,7 +44,7 @@ async function searchTracked(
     const { hits, skipped } = await searchYoutube(query);
     logger.info(
       {
-        ...sourceLogFields(isAdmin, { query }),
+        ...logSource({ query }),
         hits: hits.length,
         skipped: skipped.length,
         ms: Date.now() - startedAt,
@@ -59,7 +57,7 @@ async function searchTracked(
       // выдачи, а не «ничего не нашлось». Ловится этой строкой в логах.
       if (skipped.length === 0) {
         logger.warn(
-          sourceLogFields(isAdmin, { query }),
+          logSource({ query }),
           'search: в выдаче нет ни одного видео',
         );
       }
@@ -81,7 +79,7 @@ async function searchTracked(
     logger.error(
       {
         err,
-        ...sourceLogFields(isAdmin, { query }),
+        ...logSource({ query }),
         reason: err instanceof SearchError ? `search_${err.kind}` : 'unknown',
         ms: Date.now() - startedAt,
       },

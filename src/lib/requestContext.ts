@@ -6,6 +6,7 @@ import {
   type RequestCommand,
 } from '../db/usage.js';
 import { logger } from './logger.js';
+import { sourceLogFields } from './privacy.js';
 
 // «Для кого сейчас работаем». Хендлер открывает запрос через withRequest, а нижние слои
 // (complete() — учёт расхода, extractor — приватность логов) читают currentRequest(),
@@ -23,6 +24,18 @@ const storage = new AsyncLocalStorage<RequestContext>();
 
 export function currentRequest(): RequestContext | undefined {
   return storage.getStore();
+}
+
+/**
+ * Поля об источнике запроса (url / file / title / query) для строки лога. Владельцу —
+ * как есть, остальным — только домен и расширение (lib/privacy.ts). Кто делает запрос,
+ * берётся из контекста; вне запроса — как для чужого. Любое логирование содержимого
+ * запроса — только через эту функцию.
+ */
+export function logSource(
+  fields: Record<string, unknown>,
+): Record<string, unknown> {
+  return sourceLogFields(currentRequest()?.isAdmin ?? false, fields);
 }
 
 /**

@@ -10,8 +10,7 @@ import { createLimiter } from '../lib/concurrency.js';
 import { replyTo } from '../lib/reply.js';
 import { config } from '../config.js';
 import { logger } from '../lib/logger.js';
-import { withRequest } from '../lib/requestContext.js';
-import { sourceLogFields } from '../lib/privacy.js';
+import { withRequest, logSource } from '../lib/requestContext.js';
 import { getDb } from '../lib/store.js';
 import { requestUser } from './onLink.js';
 
@@ -41,7 +40,7 @@ export async function runArticle(
 ): Promise<void> {
   const user = requestUser(ctx);
   await withRequest({ db: getDb(), now: Date.now }, user, 'article', () =>
-    articleTracked(ctx, url, replyToMessageId, user.isAdmin),
+    articleTracked(ctx, url, replyToMessageId),
   );
 }
 
@@ -50,7 +49,6 @@ async function articleTracked(
   ctx: Context,
   url: string,
   replyToMessageId: number | undefined,
-  isAdmin: boolean,
 ): Promise<boolean> {
   const status = await ctx.reply('⏳ Извлекаю текст…');
   const typing = setInterval(() => {
@@ -105,7 +103,7 @@ async function articleTracked(
 
     logger.info(
       {
-        ...sourceLogFields(isAdmin, { url }),
+        ...logSource({ url }),
         ok: true,
         command: 'article',
         model: result.model,
@@ -126,7 +124,7 @@ async function articleTracked(
     logger.error(
       {
         err,
-        ...sourceLogFields(isAdmin, { url }),
+        ...logSource({ url }),
         ok: false,
         command: 'article',
         reason: errorReason(err),

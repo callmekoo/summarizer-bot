@@ -12,8 +12,7 @@ import { createLimiter } from '../lib/concurrency.js';
 import { replyTo } from '../lib/reply.js';
 import { config } from '../config.js';
 import { logger } from '../lib/logger.js';
-import { withRequest } from '../lib/requestContext.js';
-import { sourceLogFields } from '../lib/privacy.js';
+import { withRequest, logSource } from '../lib/requestContext.js';
 import { getDb } from '../lib/store.js';
 
 // Глобальный лимит одновременных тяжёлых обработок (parse + LLM): защищает от
@@ -98,7 +97,7 @@ export async function summarizeSource(
 ): Promise<void> {
   const user = requestUser(ctx);
   await withRequest({ db: getDb(), now: Date.now }, user, source.command, () =>
-    summarizeTracked(ctx, source, replyToMessageId, user.isAdmin),
+    summarizeTracked(ctx, source, replyToMessageId),
   );
 }
 
@@ -116,7 +115,6 @@ async function summarizeTracked(
   ctx: Context,
   source: SummarySource,
   replyToMessageId: number | undefined,
-  isAdmin: boolean,
 ): Promise<boolean> {
   const status = await ctx.reply(source.status);
   // Держим индикатор «печатает», пока идёт загрузка + запрос к LLM.
@@ -163,7 +161,7 @@ async function summarizeTracked(
     // Метрики: одна строка на успешный запрос.
     logger.info(
       {
-        ...sourceLogFields(isAdmin, source.log),
+        ...logSource(source.log),
         ok: true,
         model: result.model,
         parseMs,
@@ -187,7 +185,7 @@ async function summarizeTracked(
     logger.error(
       {
         err,
-        ...sourceLogFields(isAdmin, source.log),
+        ...logSource(source.log),
         ok: false,
         reason: errorReason(err),
         parseMs,
