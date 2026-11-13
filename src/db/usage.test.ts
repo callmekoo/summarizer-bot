@@ -111,3 +111,20 @@ test('разбивка по командам и последний запрос'
   ]);
   assert.equal(lastRequestAt(db, A), T + 2);
 });
+
+test('топ: сколько вызовов с известной и неизвестной стоимостью', () => {
+  const r = startRequest(db, A, 'article', T);
+  call(r, 0.001);
+  call(r, null);
+  call(r, null);
+  const [row] = topUsers(db, 0, 5);
+  assert.equal(row!.pricedCalls, 1);
+  assert.equal(row!.unpricedCalls, 2);
+});
+
+test('топ: запрос без вызовов LLM не считается неоценённым', () => {
+  startRequest(db, A, 'search', T);
+  const [row] = topUsers(db, 0, 5);
+  assert.equal(row!.pricedCalls, 0);
+  assert.equal(row!.unpricedCalls, 0);
+});

@@ -97,3 +97,31 @@ test('неизвестный пользователь → not_found', async () =
   });
   assert.equal(r.kind, 'not_found');
 });
+
+test('команда без изменения статуса: «уже», без повторного уведомления', async () => {
+  await applyDecision(deps(), 5, 'approve', { onlyIfPending: false });
+  const again = await applyDecision(deps(), 5, 'approve', {
+    onlyIfPending: false,
+  });
+  assert.equal(again.kind, 'already');
+  assert.equal(sent.length, 1); // приветствие ушло один раз
+});
+
+test('повторный /revoke не перезапускает кулдаун', async () => {
+  await applyDecision(deps(), 5, 'reject', { onlyIfPending: false });
+  const retryAfter = getUser(db, 5)?.retryAfter;
+  const later: Admin.DecisionDeps = { ...deps(), now: () => NOW + 3 * DAY };
+  const again = await applyDecision(later, 5, 'reject', {
+    onlyIfPending: false,
+  });
+  assert.equal(again.kind, 'already');
+  assert.equal(getUser(db, 5)?.retryAfter, retryAfter);
+  assert.equal(sent.length, 1);
+});
+
+test('повторный /ban — «уже», статус тот же', async () => {
+  await applyDecision(deps(), 5, 'ban', { onlyIfPending: false });
+  const again = await applyDecision(deps(), 5, 'ban', { onlyIfPending: false });
+  assert.equal(again.kind, 'already');
+  assert.equal(getUser(db, 5)?.status, 'banned');
+});

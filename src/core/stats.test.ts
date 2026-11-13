@@ -89,10 +89,27 @@ test('строка периода и топ', () => {
   };
   const text = renderStats(periods(t), [
     {
-      row: { userId: 5, requests: 5, tokens: 100, costUsd: 0.003 },
+      row: {
+        userId: 5,
+        requests: 5,
+        tokens: 100,
+        costUsd: 0.003,
+        pricedCalls: 2,
+        unpricedCalls: 0,
+      },
       user: user(5, { username: 'ivanp' }),
     },
-    { row: { userId: 6, requests: 1, tokens: 1, costUsd: 0 }, user: undefined },
+    {
+      row: {
+        userId: 6,
+        requests: 1,
+        tokens: 1,
+        costUsd: 0,
+        pricedCalls: 0,
+        unpricedCalls: 0,
+      },
+      user: undefined,
+    },
   ]);
   assert.ok(text.includes('<b>Сегодня</b>: 3 запр. (1 ошиб.)'));
   assert.ok(text.includes('$0.0030'));
@@ -174,4 +191,25 @@ test('300 пользователей режутся на части ≤ 4096 и 
   for (const p of parts) assert.ok(p.length <= 4096);
   const all = parts.join('\n');
   for (const u of users) assert.ok(all.includes(`id ${u.id}`), String(u.id));
+});
+
+test('топ: стоимость по тем же правилам, что у периодов', () => {
+  const top = (pricedCalls: number, unpricedCalls: number, costUsd: number) =>
+    renderStats(periods(ZERO), [
+      {
+        row: {
+          userId: 5,
+          requests: 1,
+          tokens: 10,
+          costUsd,
+          pricedCalls,
+          unpricedCalls,
+        },
+        user: user(5, { username: 'ivanp' }),
+      },
+    ]);
+  assert.ok(top(0, 2, 0).includes('— $ —, 1 запр.'));
+  assert.ok(top(1, 1, 0.002).includes('— $0.0020 + н/д, 1 запр.'));
+  assert.ok(top(1, 0, 0.002).includes('— $0.0020, 1 запр.'));
+  assert.ok(top(0, 0, 0).includes('— $0, 1 запр.'));
 });

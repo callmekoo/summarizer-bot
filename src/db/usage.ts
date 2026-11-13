@@ -103,6 +103,8 @@ export interface TopRow {
   requests: number;
   tokens: number;
   costUsd: number;
+  pricedCalls: number;
+  unpricedCalls: number;
 }
 
 /** Кто больше всех потратил с момента since: по стоимости, при равенстве — по токенам. */
@@ -112,7 +114,10 @@ export function topUsers(db: Db, since: number, limit: number): TopRow[] {
       `SELECT r.user_id AS userId,
               count(DISTINCT r.id) AS requests,
               coalesce(sum(c.prompt_tokens + c.completion_tokens), 0) AS tokens,
-              coalesce(sum(c.cost_usd), 0) AS costUsd
+              coalesce(sum(c.cost_usd), 0) AS costUsd,
+              count(c.cost_usd) AS pricedCalls,
+              coalesce(sum(c.id IS NOT NULL AND c.cost_usd IS NULL), 0)
+                AS unpricedCalls
        FROM requests r LEFT JOIN llm_calls c ON c.request_id = r.id
        WHERE r.started_at >= ?
        GROUP BY r.user_id

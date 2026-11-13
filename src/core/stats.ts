@@ -46,8 +46,7 @@ export function renderStats(
   if (top.length === 0) lines.push('нет данных');
   top.forEach(({ row, user }, i) => {
     const who = user ? userLabelHtml(user) : `id ${row.userId}`;
-    const cost = row.costUsd > 0 ? `$${row.costUsd.toFixed(4)}` : '$0';
-    lines.push(`${i + 1}. ${who} — ${cost}, ${row.requests} запр.`);
+    lines.push(`${i + 1}. ${who} — ${formatCost(row)}, ${row.requests} запр.`);
   });
   return lines.join('\n');
 }

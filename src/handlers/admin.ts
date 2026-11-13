@@ -53,6 +53,12 @@ const DONE_LABEL: Record<AdminAction, string> = {
   ban: '🚫 забанен',
 };
 
+const ALREADY_LABEL: Record<AdminAction, string> = {
+  approve: 'уже одобрен, ничего не меняю',
+  reject: 'уже отклонён, срок повторной заявки не меняю',
+  ban: 'уже забанен',
+};
+
 const DAY_MS = 86_400_000;
 
 /**
@@ -69,6 +75,10 @@ export async function applyDecision(
   const current = getUser(deps.db, userId);
   if (!current) return { kind: 'not_found' };
   if (opts.onlyIfPending && current.status !== 'pending') {
+    return { kind: 'already', user: current };
+  }
+  // Статус и так такой: не шлём приветствие повторно и не перезапускаем кулдаун.
+  if (current.status === STATUS_OF[action]) {
     return { kind: 'already', user: current };
   }
 
@@ -187,8 +197,14 @@ async function decideByCommand(
   const r = await applyDecision(decisionDeps(ctx), target.id, action, {
     onlyIfPending: false,
   });
-  if (r.kind !== 'done') {
+  if (r.kind === 'not_found') {
     await ctx.reply('Не нашёл пользователя.');
+    return;
+  }
+  if (r.kind === 'already') {
+    await ctx.reply(`${userLabelHtml(r.user)} — ${ALREADY_LABEL[action]}`, {
+      parse_mode: 'HTML',
+    });
     return;
   }
   const note = r.notified || action === 'ban' ? '' : ' (уведомить не удалось)';
