@@ -9,22 +9,70 @@ import { onArticle } from './handlers/onArticle.js';
 import { onDocument } from './handlers/onDocument.js';
 import { onSearch, onSearchCommand } from './handlers/onSearch.js';
 import { PICK_COMMAND_RE } from './core/youtubeSearch.js';
-import { COMMANDS } from './commands.js';
-import { allowlist } from './middleware/allowlist.js';
+import { COMMANDS, PUBLIC_COMMANDS } from './commands.js';
+import {
+  createAccess,
+  isAdmin,
+  renderApplication,
+  applicationKeyboard,
+} from './middleware/access.js';
+import {
+  onAccessButton,
+  onUsers,
+  onStats,
+  onApprove,
+  onRevoke,
+  onBan,
+} from './handlers/admin.js';
 import { rateLimit } from './middleware/rateLimit.js';
+import { initStore } from './lib/store.js';
+import { seedApproved } from './db/users.js';
+import type { Db } from './db/database.js';
+
+// База пользователей и статистики. Без неё проверка доступа невозможна, а работать без
+// проверки — значит тратить деньги на кого угодно. Поэтому не открылась — выходим.
+let db: Db;
+try {
+  db = await initStore();
+  // Тут же, под тем же понятным сообщением: SQLITE_BUSY (файл держит другой процесс) или
+  // запись в недоступный каталог иначе уронили бы старт сырым стектрейсом.
+  seedApproved(db, config.ALLOWED_USER_IDS, Date.now());
+} catch (err) {
+  logger.fatal(
+    { err, path: config.DB_PATH },
+    'не удалось открыть базу (DB_PATH): проверь путь и права на каталог',
+  );
+  process.exit(1);
+}
+logger.info(
+  { admin: config.ADMIN_USER_ID, preapproved: config.ALLOWED_USER_IDS.length },
+  'доступ по заявкам включён',
+);
 
 const bot = new Bot(config.BOT_TOKEN);
 
-if (config.ALLOWED_USER_IDS.length === 0) {
-  logger.warn(
-    'ALLOWED_USER_IDS пуст — бот отвечает всем. Укажи свой Telegram ID в .env.',
-  );
-} else {
-  logger.info({ count: config.ALLOWED_USER_IDS.length }, 'allowlist включён');
-}
-
-bot.use(allowlist);
+bot.use(
+  createAccess({
+    db,
+    adminId: config.ADMIN_USER_ID,
+    now: Date.now,
+    notifyAdmin: async (user) => {
+      await bot.api.sendMessage(config.ADMIN_USER_ID, renderApplication(user), {
+        parse_mode: 'HTML',
+        reply_markup: applicationKeyboard(user.id),
+      });
+    },
+  }),
+);
 bot.use(rateLimit);
+// Команды и кнопки владельца. Для остальных их нет: апдейт идёт дальше, как обычный текст.
+const admin = bot.filter(isAdmin);
+admin.callbackQuery(/^access:(approve|reject|ban):(\d+)$/, onAccessButton);
+admin.command('users', onUsers);
+admin.command('stats', onStats);
+admin.command('approve', onApprove);
+admin.command('revoke', onRevoke);
+admin.command('ban', onBan);
 // До общего обработчика текста, иначе `/article <url>` уйдёт в пересказ.
 bot.command('summary', onLink);
 bot.command('article', onArticle);
@@ -88,15 +136,20 @@ bot
     onStart: (me) => {
       writeHeartbeat();
       // Меню у поля ввода. Сетевой вызов, но без меню бот работоспособен — только warn.
+      const menu = (list: typeof COMMANDS) =>
+        list.map(({ command, description }) => ({ command, description }));
       void bot.api
-        .setMyCommands(
-          COMMANDS.map(({ command, description }) => ({
-            command,
-            description,
-          })),
-        )
+        .setMyCommands(menu(PUBLIC_COMMANDS))
         .catch((err: unknown) =>
           logger.warn({ err }, 'не удалось зарегистрировать меню команд'),
+        );
+      // Владельцу — меню с админскими командами. Падает, если он ни разу не писал боту.
+      void bot.api
+        .setMyCommands(menu(COMMANDS), {
+          scope: { type: 'chat', chat_id: config.ADMIN_USER_ID },
+        })
+        .catch((err: unknown) =>
+          logger.warn({ err }, 'не удалось зарегистрировать меню владельца'),
         );
       logger.info({ username: me.username }, 'бот запущен');
     },

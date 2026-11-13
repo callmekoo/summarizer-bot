@@ -1,4 +1,5 @@
 import { logger } from '../lib/logger.js';
+import { logSource } from '../lib/requestContext.js';
 import type { Chapter, ExtractResult, TranscriptSegment } from '../types.js';
 
 export type ExtractErrorKind = 'empty' | 'timeout' | 'failed';
@@ -80,7 +81,10 @@ export async function extract(url: string): Promise<ExtractResult> {
       if (err instanceof ExtractError && err.kind === 'empty') throw err;
       lastErr = err;
       if (attempt < MAX_ATTEMPTS) {
-        logger.warn({ err, url, attempt }, 'rdrr: транзиентный сбой, повтор');
+        logger.warn(
+          { err, ...logSource({ url }), attempt },
+          'rdrr: транзиентный сбой, повтор',
+        );
         await sleep(BACKOFF_MS * attempt);
       }
     }
@@ -88,7 +92,7 @@ export async function extract(url: string): Promise<ExtractResult> {
 
   // Попытки исчерпаны.
   if (lastErr instanceof ExtractError) throw lastErr; // таймаут
-  logger.error({ err: lastErr, url }, 'rdrr parse failed');
+  logger.error({ err: lastErr, ...logSource({ url }) }, 'rdrr parse failed');
   throw new ExtractError('failed', 'не удалось извлечь текст по ссылке');
 }
 

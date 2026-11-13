@@ -24,7 +24,7 @@ npm run dev
 
 ## Стек
 
-- **TypeScript / Node.js 22.12+**, ESM (`"type": "module"`, `module: NodeNext`).
+- **TypeScript / Node.js 22.13+** (`node:sqlite` без флага), ESM (`"type": "module"`, `module: NodeNext`).
 - **grammY** — телеграм-бот. **rdrr** — извлечение текста (как библиотека).
 - **LLM** — любой OpenAI-совместимый API через `openai` SDK; провайдер задаётся
   `LLM_BASE_URL` + `LLM_API_KEY` (дефолт — OpenRouter).
@@ -48,11 +48,16 @@ npm start          # node dist/bot.js (прод)
 ```
 
 **Тесты:** встроенный `node:test` + `node:assert`, без внешних зависимостей. Файлы
-рядом с кодом (`*.test.ts`). Покрыты чистые модули (formatter, url, allowlist, парсинг
-config, разбор выдачи и список `/search`, разбор файлов). Сетевые вызовы (rdrr, OpenRouter) в юнит-тестах не дёргаем — для них чистую
-логику выносим в тестируемые функции (напр. `isAllowed`, `retryAfterMs`).
+рядом с кодом (`*.test.ts`). Покрыты чистые модули (formatter, url, парсинг
+config, разбор выдачи и список `/search`, разбор файлов, доступ, имена, отчёты `/stats`),
+репозитории `db/` (на `:memory:`) и middleware доступа (фейковый ctx). Сетевые вызовы (rdrr, OpenRouter) в юнит-тестах не дёргаем — для них чистую
+логику выносим в тестируемые функции (напр. `decideAccess`, `retryAfterMs`).
 
 ## Архитектура
+
+Перед всеми пайплайнами — **доступ** (Этап 9): `access` → `rateLimit` → админские команды
+(`bot.filter(isAdmin)`) → остальные хендлеры. Незнакомец → заявка владельцу с кнопками;
+решение — чистая `decideAccess`. Пользователи и статистика — SQLite (`db/`).
 
 Три пайплайна:
 
@@ -73,8 +78,15 @@ src/
   commands.ts       реестр команд: имена, описания, renderHelp(). Хендлеров тут нет
   handlers/         onStart, onHelp, onLink (/summary + текст, runSummary, summarizeSource),
                     onArticle (/article, runArticle), onSearch (/search + команды /sum_ /art_),
-                    onDocument (присланный файл → пересказ)
-  middleware/       allowlist (ALLOWED_USER_IDS), rateLimit (RATE_LIMIT_PER_MIN)
+                    onDocument (присланный файл → пересказ),
+                    admin (кнопки заявок, /users, /stats, /approve, /revoke, /ban)
+  middleware/       access (доступ по заявкам, createAccess(deps)), rateLimit
+                    (RATE_LIMIT_PER_MIN; владельца не трогает)
+  db/
+    database.ts     openDatabase: node:sqlite (грузится динамически), PRAGMA, схема
+    users.ts        пользователи: заявка, статус, seedApproved, поиск по id/@нику
+    usage.ts        requests (действия) + llm_calls (платные вызовы) + агрегаты
+    sqlGuard.test.ts страж: SQL в src/db только литералом
   core/
     extractor.ts    rdrr.parse(url) с таймаутом + 3 ретрая; ошибки → ExtractError(kind).
                     Для youtube отдаёт ещё chapters[] и transcript[] (нужны статье)
@@ -88,12 +100,19 @@ src/
     formatter.ts    escape HTML → **bold**→<b> → разбивка ≤4096; шапка источника
     youtubeSearch.ts поиск через InnerTube, отсев эфиров/шортсов, список + команды.
                     Без config/logger — тесты и smoke-скрипт работают без .env
+    access.ts       decideAccess(user, isAdmin, now) + тексты для пользователя
+    users.ts        UserRow, displayName (чистка имён), userLabelHtml — единый формат
+                    «@ник (Имя, id)» для заявок, /users, /stats и ответов на команды
+    stats.ts        periodStarts, formatCost, renderStats/renderUserStats/renderUsers
   llm/
     client.ts       OpenAI-совместимый клиент
     complete.ts     ЕДИНСТВЕННОЕ место вызова LLM: перебор MODEL→MODEL_FALLBACK,
-                    404/429, повтор по Retry-After. SummarizeError живёт здесь
+                    404/429, повтор по Retry-After. SummarizeError живёт здесь.
+                    Пишет каждый ответ провайдера в llm_calls текущего запроса
     prompts.ts      SAFETY_RULES + промпты пересказа и статьи; wrapUntrusted (нонс-маркеры)
-  lib/              url, logger, concurrency, rateLimiter, filename (slug для .md)
+  lib/              url, logger, concurrency, rateLimiter, filename (slug для .md),
+                    store (база процесса), requestContext (withRequest/currentRequest),
+                    privacy (sourceLogFields)
   types.ts          ExtractResult, Chapter, TranscriptSegment, isVideo()
   scripts/          searchSmoke.ts — живая проверка поиска, в build не попадает
 ```
@@ -145,6 +164,39 @@ src/
   отобьёт отправку целиком. Многочастный пересказ идёт цепочкой: часть 1 отвечает на ссылку,
   каждая следующая — на предыдущую (id берётся у ответа `ctx.reply`).
 - **Вызывать LLM только через `llm/complete.ts`.** Логика фолбэков и 429 тонкая — не дублируй.
+- **Расход привязывается к пользователю через контекст запроса** (`lib/requestContext.ts`,
+  AsyncLocalStorage). Хендлер оборачивает работу в `withRequest(…, command, fn)` — строка в
+  `requests`; `complete()` сам пишет каждый ответ провайдера в `llm_calls` через
+  `currentRequest()`. **Новый путь к LLM — только внутри `withRequest`**, иначе расход не
+  попадёт в статистику (молча). Сбой записи статистики — `warn`, ответ пользователю не ломается.
+- **SQL — только строковым литералом** в `prepare()`/`exec()`, значения — параметрами `?`.
+  `db/sqlGuard.test.ts` читает исходники `src/db/*.ts` и падает на `${…}`, `+` и переменной
+  в аргументе. Побочный эффект: в `src/db` нельзя `RegExp.exec` — используй `String.match`.
+  Фильтр «по одному пользователю или по всем» — условием `(? IS NULL OR user_id = ?)`.
+- **Содержимое чужих запросов не храним и не логируем** (решение владельца). В базе нет url,
+  заголовков, поисковых запросов, имён файлов. В логах поля `url`/`title`/`query`/`file` —
+  только через `logSource({…})` (`lib/requestContext.ts`; кто владелец — из контекста
+  запроса): для не-владельца `host` и `ext`. Названия глав и прочий текст запроса не пишем
+  вовсе. Страж — `lib/logPrivacy.test.ts` (перехватывает реальный вывод pino на `/article`). Поле `err`
+  сериализует `lib/errorLog.ts`: вырезает `payload` (у `GrammyError` там текст сообщения,
+  подпись, файл) и `metadata` (у OpenRouter — фрагмент входа). Не обходи его своим `err`.
+- **Админские команды** регистрируются на `admin = bot.filter(isAdmin)` (`admin.command`), в
+  реестре `commands.ts` — с `admin: true`: в `/help` их нет, меню владельцу ставится
+  отдельно (`setMyCommands` со `scope: chat`). Кнопки заявки работают только по `pending`
+  (`onlyIfPending`) — старая кнопка не перебьёт решение командой.
+- **Healthcheck описан дважды**: `HEALTHCHECK` в `Dockerfile` и `HealthCmd=` в
+  `deploy/podman/summarizer-bot.container` (Podman не видит `HEALTHCHECK` в OCI-образах).
+  Меняешь команду или интервалы — меняй в обоих местах.
+- **`node:sqlite` грузится динамически** (`openDatabase`): статический импорт печатает
+  ExperimentalWarning раньше любого нашего кода, а так мы глушим ровно его. В тестах и коде
+  импортируй из `node:sqlite` только типы (`import type`).
+- **Доступ fail closed:** ошибка базы в `access` → «Временная ошибка», дальше не пускаем.
+  Владелец (`ADMIN_USER_ID`) проходит всегда, даже без строки в базе; его профиль пишется
+  в `users` (`touchAdmin`, статус всегда approved) — ошибка записи лишь `warn`.
+- **Неодобренным `access` отвечает только на сообщения и кнопки.** Telegram шлёт и служебные
+  события (`my_chat_member` — человек заблокировал/разблокировал бота): на них — молча, без
+  заявки и ответа. Иначе блокировка после кулдауна заводила бы заявку. Ответ неодобренному
+  идёт через `safeReply`: не ушёл — не повод пропустить уведомление владельцу о заявке.
 - **Реклама в главах видео.** Авторы часто размечают рекламу отдельной главой («Реклама»).
   Мы передаём названия глав модели как основу для заголовков — то есть без фильтра сами
   приказываем ей сделать раздел «Реклама», и она слушается (реальный баг). Поэтому
@@ -189,7 +241,7 @@ src/
   `&amp;nbsp;`) и в пересказе. Таблица имён в `document.ts` неполная (типографика), чужое
   имя остаётся как есть.
 - **Тест модуля, который тянет `config` (напрямую или через `logger`)**, задаёт env в
-  `before()` и импортирует модуль динамически (см. `summarizer.test.ts`): статический импорт
+  `before()` (включая обязательный `ADMIN_USER_ID`) и импортирует модуль динамически (см. `summarizer.test.ts`): статический импорт
   без `.env` роняет весь файл, а хук гоняет `npm run check` и там, где `.env` нет.
 - Ошибки наружу — понятным текстом пользователю, не стек-трейсом (см. `onLink`).
 - Провайдер настраивается (`LLM_BASE_URL`/`LLM_API_KEY`), всё ниже — **специфика
@@ -204,9 +256,10 @@ src/
 ## Статус и следующие шаги
 
 Готовы Этапы 0–3 и бо́льшая часть Этапа 4: happy path, устойчивость (ретраи rdrr,
-fallback-модель + повтор по 429, очередь `MAX_CONCURRENCY`, rate-limit, allowlist),
+fallback-модель + повтор по 429, очередь `MAX_CONCURRENCY`, rate-limit),
 шапка источника, метрики (строка `request`), Docker + compose + heartbeat-healthcheck.
-Развёрнут на GitHub: `callmekoo/summarizer-bot`. Образ собирает CI
+Развёрнут на GitHub: `callmekoo/summarizer-bot`. Для Podman — quadlet-юнит в
+`deploy/podman/` (вместо compose; см. README «Podman»). Образ собирает CI
 (`.github/workflows/docker.yml`) и пушит в GHCR (`ghcr.io/callmekoo/summarizer-bot`);
 на сервере — `docker compose pull` (сборку с слабого VPS убрали, там `tsc` шёл минутами).
 
@@ -226,9 +279,19 @@ fallback-модель + повтор по 429, очередь `MAX_CONCURRENCY`,
 YouTube (`search:smoke`) и владельцем в Telegram. Из облачной песочницы youtube.com закрыт —
 живой поиск гоняется локально.
 
+Готов **доступ по заявкам и статистика** (Этап 9): заявка владельцу с кнопками, кулдаун
+после отказа, бан, `/users`, `/stats` (запросы, токены, $ из `usage.cost` OpenRouter),
+`/approve`/`/revoke`/`/ban`; SQLite (`node:sqlite`), именованный Docker-том `bot-data`.
+Проверено юнит-тестами и smoke-прогоном с фейковым LLM; в живом Telegram — за владельцем.
+Формат `usage.cost` OpenRouter из песочницы не сверить (openrouter.ai закрыт) — проверить
+на первом живом запросе: если `/stats` показывает «$ —», поле пришло иначе.
+
 Открыто (см. [PLAN.md](PLAN.md)):
 - **webhook** вместо polling — и тогда healthcheck переделать на HTTP `/health`;
-- опциональный **SQLite-кэш по URL**;
+- опциональный **SQLite-кэш по URL** (база уже есть — `db/`);
+- **лимиты** на пользователя или общий потолок трат — схема `requests`/`llm_calls` готова;
+- **флуд от неодобренных**: ответ «на рассмотрении»/«отклонено» на каждое сообщение
+  (осознанно не закрыто; вариант — не чаще раза в час);
 - map-reduce для **пересказа** сверхдлинных текстов — сейчас там один проход с ориентиром
   по объёму (`summaryBudget`) и обрезка с предупреждением. Понадобится, если по логам
   окажется, что на часовом видео пересказ систематически игнорирует вторую половину:

@@ -1,0 +1,43 @@
+# Quadlet-юнит для Podman (≥ 4.4): systemd сам запускает бота, перезапускает при падении
+# и поднимает после перезагрузки сервера. Аналог docker-compose.yml.
+#
+# Установка (rootless, от своего пользователя) — см. README, раздел «Podman»:
+#   mkdir -p ~/.config/containers/systemd ~/summarizer
+#   cp deploy/podman/* ~/.config/containers/systemd/
+#   cp .env.example ~/summarizer/.env   # и заполнить
+#   systemctl --user daemon-reload && systemctl --user start summarizer-bot
+
+[Unit]
+Description=Summarizer Telegram bot
+Wants=network-online.target
+After=network-online.target
+
+[Container]
+Image=ghcr.io/callmekoo/summarizer-bot:latest
+ContainerName=summarizer-bot
+# %h — домашний каталог пользователя. Формат как у .env: KEY=VALUE, без кавычек.
+EnvironmentFile=%h/summarizer/.env
+# База пользователей и статистики (DB_PATH=data/bot.db → /app/data/bot.db).
+Volume=summarizer-bot-data.volume:/app/data
+# Healthcheck задан явно, не полагаясь на образ: Podman читает HEALTHCHECK образа не для
+# всех форматов манифеста. Команда и интервалы — как в Dockerfile, меняй вместе.
+HealthCmd=node -e "const f=process.env.HEARTBEAT_FILE||'/tmp/heartbeat';const{statSync}=require('node:fs');process.exit(Date.now()-statSync(f).mtimeMs<60000?0:1)"
+HealthInterval=30s
+HealthTimeout=5s
+HealthStartPeriod=20s
+HealthRetries=3
+# Бот «завис» (polling умер, процесс жив) → healthcheck падает → перезапуск. Замена
+# сервиса autoheal из docker-compose.yml, которому нужен docker.sock.
+HealthOnFailure=kill
+# Обновление образа: podman auto-update (или таймер podman-auto-update.timer) сам
+# подтянет свежий :latest и перезапустит бота.
+AutoUpdate=registry
+
+[Service]
+# Падение процесса, а также kill по healthcheck → systemd поднимает бота заново.
+Restart=always
+# Первый старт качает образ — даём время.
+TimeoutStartSec=300
+
+[Install]
+WantedBy=default.target

@@ -22,6 +22,9 @@
 | `/help` | список команд с пояснениями |
 | `/start` | краткое приветствие |
 
+Доступ — по заявкам (см. «Доступ и статистика» ниже); у владельца есть ещё `/users`,
+`/stats`, `/approve`, `/revoke`, `/ban`.
+
 Ссылку можно прислать и просто сообщением, без команды — это то же самое, что `/summary`.
 Готовый пересказ (или файл статьи) приходит **ответом** на сообщение со ссылкой: обработка
 занимает от десятков секунд до минут, за это время в чате успевают появиться другие сообщения.
@@ -54,7 +57,7 @@ Telegram (регистрируется при старте через `setMyComm
 
 ## Стек
 
-TypeScript (Node 22.12+) · grammY · rdrr · OpenAI-совместимый LLM API (через `openai` SDK).
+TypeScript (Node 22.13+) · grammY · rdrr · OpenAI-совместимый LLM API (через `openai` SDK).
 
 ## Запуск
 
@@ -128,7 +131,7 @@ sudo usermod -aG docker "$USER"   # чтобы запускать без sudo; �
 
 ```sh
 git clone <repo-url> summarizer && cd summarizer
-cp .env.example .env              # вписать BOT_TOKEN, LLM_API_KEY, MODEL, ALLOWED_USER_IDS
+cp .env.example .env              # вписать BOT_TOKEN, LLM_API_KEY, MODEL, ADMIN_USER_ID
 docker compose pull               # скачать готовый образ из GHCR
 docker compose up -d              # поднять в фоне
 ```
@@ -147,6 +150,11 @@ docker compose down               # остановить и удалить ко�
 
 Обновление после изменений в коде (CI уже собрал и запушил новый образ в GHCR):
 
+> ⚠️ **Переход на версию с доступом по заявкам (Этап 9):** до `pull` добавь в `.env`
+> `ADMIN_USER_ID` (и лучше `TZ=Europe/Moscow`) — без него бот не стартует. И напиши боту
+> `/start` сам, иначе заявки до тебя не дойдут. `ALLOWED_USER_IDS` при первом старте
+> станут одобренными пользователями базы.
+
 ```sh
 docker compose pull               # подтянуть свежий :latest
 docker compose up -d              # перезапустить на новом образе
@@ -155,6 +163,64 @@ docker compose up -d              # перезапустить на новом �
 `restart: unless-stopped` поднимет бота после краша и перезагрузки сервера. Чтобы ещё и
 авто-перезапускать «зависший» (unhealthy) контейнер — раскомментируй сервис `autoheal`
 в [docker-compose.yml](docker-compose.yml).
+
+## Podman (вместо Docker)
+
+Образ обычный OCI — Podman его запускает. Вместо compose удобнее **quadlet** (Podman ≥ 4.4):
+два файла в [deploy/podman/](deploy/podman/), а запуск, перезапуск при падении, подъём
+после перезагрузки и логи берёт на себя systemd. Без root, от своего пользователя.
+
+```sh
+mkdir -p ~/.config/containers/systemd ~/summarizer
+cp deploy/podman/summarizer-bot.container deploy/podman/summarizer-bot-data.volume ~/.config/containers/systemd/
+cp .env.example ~/summarizer/.env   # заполнить: BOT_TOKEN, LLM_API_KEY, MODEL, ADMIN_USER_ID, TZ
+```
+
+```sh
+systemctl --user daemon-reload
+systemctl --user start summarizer-bot
+loginctl enable-linger "$USER"      # чтобы бот жил без входа в систему и после перезагрузки
+```
+
+`.env` для Podman — строки `KEY=VALUE` **без кавычек** (кавычки попадут в значение).
+
+Управление:
+
+```sh
+systemctl --user status summarizer-bot      # статус
+journalctl --user -u summarizer-bot -f      # логи
+podman healthcheck run summarizer-bot       # healthcheck вручную (0 — здоров)
+podman auto-update                          # подтянуть свежий :latest и перезапустить
+```
+
+Для автообновления по расписанию: `systemctl --user enable --now podman-auto-update.timer`.
+
+Чем отличается от `docker-compose.yml`:
+
+- **autoheal не нужен**: «зависший» бот (healthcheck падает) убивается
+  (`HealthOnFailure=kill`), systemd поднимает его заново (`Restart=always`).
+- **Healthcheck задан в юните явно** (`HealthCmd=…`), а не берётся из образа: Podman видит
+  `HEALTHCHECK` не во всех форматах образа (в собранном им самим OCI-образе его нет).
+  Команда и интервалы — те же, что в `Dockerfile`; меняешь там — меняй и тут.
+- **Бэкап базы** — те же команды, что для Docker, через `podman`:
+
+```sh
+podman exec summarizer-bot node --no-warnings -e "new (require('node:sqlite').DatabaseSync)('data/bot.db').exec(\"VACUUM INTO 'data/backup.db'\")"
+```
+
+```sh
+podman cp summarizer-bot:/app/data/backup.db ./bot-backup.db
+```
+
+```sh
+podman exec summarizer-bot rm data/backup.db
+```
+
+Что проверено (Podman 4.9.3): генератор quadlet принимает оба файла без ошибок; образ
+собирается из нашего `Dockerfile` без правок; в именованном томе бот создаёт базу от
+пользователя `node` без ручного `chown`; healthcheck из юнита отличает живого бота от
+зависшего; команды бэкапа работают. **Не проверено**: запуск самого юнита через systemd и
+работа с настоящим Telegram — сделай `systemctl --user status` после первого старта.
 
 ## Переменные окружения
 
@@ -173,12 +239,15 @@ docker compose up -d              # перезапустить на новом �
 | `MAX_INPUT_TOKENS` | лимит входных токенов (свыше — обрезка + предупреждение) | `200000` |
 | `RATE_LIMIT_PER_MIN` | лимит запросов/мин на пользователя | `5` |
 | `MAX_CONCURRENCY` | одновременных обработок (parse + LLM) | `2` |
-| `ALLOWED_USER_IDS` | белый список Telegram ID через запятую (пусто = все) | — |
+| `ADMIN_USER_ID` | Telegram ID владельца: заявки, `/stats`, `/users` | — (обязательна) |
+| `ALLOWED_USER_IDS` | одобренные заранее, через запятую (без заявки). Убрать id из списка доступ **не** отзывает — для этого `/revoke` | — |
+| `DB_PATH` | файл SQLite с пользователями и статистикой | `data/bot.db` |
+| `ACCESS_RETRY_DAYS` | через сколько дней отклонённый может подать заявку снова | `7` |
+| `TZ` | часовой пояс для «сегодня» в `/stats` | системный (в Docker — UTC) |
 | `HEARTBEAT_FILE` | файл heartbeat для Docker healthcheck | `/tmp/heartbeat` |
 | `LOG_LEVEL` | уровень логов pino | `info` |
 
-Свой Telegram ID — у [@userinfobot](https://t.me/userinfobot). Пустой `ALLOWED_USER_IDS`
-= бот открыт всем (на старте пишет предупреждение в лог).
+Свой Telegram ID — у [@userinfobot](https://t.me/userinfobot).
 
 Живой список бесплатных моделей OpenRouter:
 
@@ -186,6 +255,66 @@ docker compose up -d              # перезапустить на новом �
 curl -s https://openrouter.ai/api/v1/models | \
   jq -r '.data[] | select(.id | endswith(":free")) | .id'
 ```
+
+## Доступ и статистика
+
+Запросы к LLM платные, поэтому бот работает **по заявкам**:
+
+1. Незнакомец пишет боту что угодно → получает «Заявка отправлена владельцу», а владельцу
+   (`ADMIN_USER_ID`) приходит «Новая заявка: @ник (Имя, id …)» с кнопками
+   **✅ Одобрить / ❌ Отклонить / 🚫 Забанить**.
+2. **Одобрить** — человеку приходит «Доступ открыт!» и приветствие, дальше он пользуется
+   ботом без ограничений (кроме общего `RATE_LIMIT_PER_MIN`).
+3. **Отклонить** — человеку приходит дата, после которой можно подать заявку снова
+   (`ACCESS_RETRY_DAYS`); до неё бот отвечает той же фразой, владельца не беспокоит.
+4. **Забанить** — бот молча игнорирует человека.
+
+> ⚠️ Сначала напиши боту `/start` сам: Telegram не даёт боту писать первым, и без этого
+> заявки до владельца не дойдут (они сохранятся и будут видны в `/users`).
+
+Пользователь везде — в заявках, `/users`, `/stats` — показывается как `@ник (Имя, id)`;
+у кого нет ника — `без ника (Имя, id)`: по id тогда работают `/ban`, `/approve`, `/revoke`.
+
+Команды владельца (у остальных их нет ни в меню, ни в `/help`):
+
+| Команда | Что делает |
+|---|---|
+| `/users` | кто одобрен, ждёт, отклонён, забанен |
+| `/stats` | сегодня / 7 / 30 дней / всё время: запросы, токены, $; топ-5 по тратам за 30 дней |
+| `/stats <id\|@ник>` | то же по одному человеку + разбивка по командам и дата последнего запроса |
+| `/approve <id\|@ник>` | одобрить (в т.ч. разбанить) |
+| `/revoke <id\|@ник>` | отозвать доступ (как «Отклонить») |
+| `/ban <id\|@ник>` | забанить |
+
+**Стоимость** берётся из ответа OpenRouter (`usage.cost`, бот сам просит её флагом
+`usage: { include: true }` — только для openrouter.ai). Другие провайдеры её не присылают —
+тогда в `/stats` «$ —», а токены и запросы считаются как обычно.
+
+**Приватность.** Что именно присылают пользователи, бот не хранит: в базе только кто, когда,
+какая команда, модель, токены и стоимость. В логах для чужих запросов вместо ссылки — домен,
+вместо имени файла — расширение, заголовки и поисковые запросы не пишутся.
+
+**Хранилище** — SQLite (встроенный `node:sqlite`, нужен Node ≥ 22.13), файл `DB_PATH`.
+В Docker — именованный том `bot-data`.
+
+**Бэкап.** Просто скопировать `bot.db` нельзя: база в режиме WAL, свежие записи лежат в
+`bot.db-wal`, и копия одного файла выходит старой (а то и пустой). Снимок делает сам SQLite
+(`VACUUM INTO`), потом его забираем и удаляем из тома:
+
+```sh
+docker compose exec bot node --no-warnings -e "new (require('node:sqlite').DatabaseSync)('data/bot.db').exec(\"VACUUM INTO 'data/backup.db'\")"
+```
+
+```sh
+docker compose cp bot:/app/data/backup.db ./bot-backup.db
+```
+
+```sh
+docker compose exec bot rm data/backup.db
+```
+
+Восстановить: остановить бота, положить файл в том как `bot.db` (без старых `bot.db-wal` и
+`bot.db-shm`) и поднять снова.
 
 ## Команда `/article` — видео в статью
 
@@ -272,12 +401,14 @@ src/
   commands.ts       список команд: меню Telegram + текст /help
   types.ts          ExtractResult и типы глав/транскрипта
   handlers/         хендлеры Telegram (onStart, onHelp, onLink, onArticle, onSearch,
-                    onDocument)
-  middleware/       allowlist (Telegram ID), rateLimit (запросов/мин)
+                    onDocument, admin — команды и кнопки владельца)
+  middleware/       access (доступ по заявкам), rateLimit (запросов/мин)
+  db/               SQLite: схема, пользователи, учёт запросов и вызовов LLM
   core/             extractor, document, summarizer, chunker, article, formatter,
-                    youtubeSearch
+                    youtubeSearch, access (решение о доступе), users (имена), stats
   llm/              клиент LLM, единая точка вызова (complete) + промпты
-  lib/              url, logger, redact, reply, filename, concurrency, rateLimiter
+  lib/              url, logger, redact, reply, filename, concurrency, rateLimiter,
+                    store (база), requestContext (кто делает запрос), privacy (логи)
   scripts/          searchSmoke — живая проверка /search (npm run search:smoke)
   **/*.test.ts      юнит-тесты рядом с кодом (node:test)
 
@@ -289,8 +420,8 @@ tsconfig.json / tsconfig.build.json                — типы / сборка (
 
 Рабочий бот, развёрнутый сценарий «ссылка → пересказ» полностью готов. Сделаны Этапы 1–3,
 бо́льшая часть Этапа 4 (Docker, compose, healthcheck, метрики), статья `/article` (Этап 5),
-меню команд и `/help` (Этап 6), поиск `/search` (Этап 7) и пересказ присланных файлов
-(Этап 8). Что осталось — открытые
+меню команд и `/help` (Этап 6), поиск `/search` (Этап 7), пересказ присланных файлов
+(Этап 8) и доступ по заявкам со статистикой (Этап 9). Что осталось — открытые
 пункты в [PLAN.md](PLAN.md): **webhook** (и тогда `/health` вместо heartbeat) и
 опциональный **SQLite-кэш по URL**. Полный map-reduce для сверхдлинных текстов — тоже
 опционально (сейчас работает обрезка с предупреждением, см. PLAN, Этап 2).
