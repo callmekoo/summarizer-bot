@@ -32,6 +32,8 @@ export interface DecisionDeps {
   db: Db;
   now: () => number;
   retryDays: number;
+  /** Владелец: его статус командами не меняем — он проходит доступ всегда. */
+  adminId: number;
   /** Сообщение пользователю (Telegram-HTML). Может упасть: человек заблокировал бота. */
   send: (chatId: number, text: string) => Promise<unknown>;
 }
@@ -39,7 +41,8 @@ export interface DecisionDeps {
 export type DecisionOutcome =
   | { kind: 'done'; user: UserRow; notified: boolean }
   | { kind: 'already'; user: UserRow }
-  | { kind: 'not_found' };
+  | { kind: 'not_found' }
+  | { kind: 'self' };
 
 const STATUS_OF: Record<AdminAction, UserStatus> = {
   approve: 'approved',
@@ -53,10 +56,20 @@ const DONE_LABEL: Record<AdminAction, string> = {
   ban: '🚫 забанен',
 };
 
-const ALREADY_LABEL: Record<AdminAction, string> = {
-  approve: 'уже одобрен, ничего не меняю',
-  reject: 'уже отклонён, срок повторной заявки не меняю',
-  ban: 'уже забанен',
+/** Итог в сообщении заявки — по текущему статусу (решение могло быть принято командой). */
+const STATUS_LABEL: Record<UserStatus, string> = {
+  approved: '✅ одобрен',
+  rejected: '❌ отклонён',
+  banned: '🚫 забанен',
+  pending: '⏳ ждёт решения',
+};
+
+/** Ответ на команду, которая ничего не меняет, — по текущему статусу. */
+const ALREADY_LABEL: Record<UserStatus, string> = {
+  approved: 'уже одобрен, ничего не меняю',
+  rejected: 'уже отклонён, срок повторной заявки не меняю',
+  banned: 'забанен, ничего не меняю (снять бан — /approve)',
+  pending: 'ждёт решения, ничего не меняю',
 };
 
 const DAY_MS = 86_400_000;
@@ -72,6 +85,7 @@ export async function applyDecision(
   action: AdminAction,
   opts: { onlyIfPending: boolean },
 ): Promise<DecisionOutcome> {
+  if (userId === deps.adminId) return { kind: 'self' };
   const current = getUser(deps.db, userId);
   if (!current) return { kind: 'not_found' };
   if (opts.onlyIfPending && current.status !== 'pending') {
@@ -79,6 +93,11 @@ export async function applyDecision(
   }
   // Статус и так такой: не шлём приветствие повторно и не перезапускаем кулдаун.
   if (current.status === STATUS_OF[action]) {
+    return { kind: 'already', user: current };
+  }
+  // Отказ мягче бана: /revoke не должен превращать бан во временный отказ с кулдауном.
+  // Снять бан — только явно, через /approve.
+  if (action === 'reject' && current.status === 'banned') {
     return { kind: 'already', user: current };
   }
 
@@ -108,6 +127,7 @@ function decisionDeps(ctx: Context): DecisionDeps {
     db: getDb(),
     now: Date.now,
     retryDays: config.ACCESS_RETRY_DAYS,
+    adminId: config.ADMIN_USER_ID,
     send: (chatId, text) =>
       ctx.api.sendMessage(chatId, text, {
         parse_mode: 'HTML',
@@ -118,32 +138,51 @@ function decisionDeps(ctx: Context): DecisionDeps {
 
 /** Кнопка под заявкой: callback-data `access:<action>:<id>`. */
 export async function onAccessButton(ctx: Context): Promise<void> {
+  await handleAccessButton(ctx, decisionDeps(ctx));
+}
+
+/**
+ * Тело onAccessButton с явными зависимостями (тестируется без общей базы).
+ *
+ * Ответ на callback может не уйти: grammY в polling обрабатывает апдейты по очереди, и
+ * пока идёт чужая /article, нажатие успевает устареть («query is too old»). Решение к этому
+ * моменту уже применено, поэтому сбой ответа не должен помешать отметить его в заявке.
+ */
+export async function handleAccessButton(
+  ctx: Context,
+  deps: DecisionDeps,
+): Promise<void> {
   const match = ctx.match as RegExpMatchArray;
   const action = match[1] as AdminAction;
   const userId = Number(match[2]);
-  const r = await applyDecision(decisionDeps(ctx), userId, action, {
-    onlyIfPending: true,
-  });
+  const r = await applyDecision(deps, userId, action, { onlyIfPending: true });
 
-  if (r.kind === 'not_found') {
-    await ctx.answerCallbackQuery({ text: 'Пользователь не найден' });
+  const answer = (text?: string) =>
+    ctx.answerCallbackQuery(text ? { text } : undefined).catch(() => {});
+  const markDone = (text: string) =>
+    // Без reply_markup Telegram убирает кнопки.
+    ctx
+      .editMessageText(text, { parse_mode: 'HTML' })
+      .catch((err: unknown) =>
+        logger.warn({ err }, 'доступ: не удалось обновить сообщение заявки'),
+      );
+
+  if (r.kind === 'not_found' || r.kind === 'self') {
+    await answer('Пользователь не найден');
+    await ctx.editMessageReplyMarkup().catch(() => {});
     return;
   }
   if (r.kind === 'already') {
-    await ctx.answerCallbackQuery({ text: 'Уже обработано' });
+    // Решение уже принято (например, командой) — показываем его в заявке и убираем кнопки.
+    await answer('Уже обработано');
+    await markDone(
+      `${renderApplication(r.user)} — ${STATUS_LABEL[r.user.status]}`,
+    );
     return;
   }
-  await ctx.answerCallbackQuery();
+  await answer();
   const note = r.notified || action === 'ban' ? '' : ' (уведомить не удалось)';
-  // Без reply_markup Telegram убирает кнопки.
-  await ctx
-    .editMessageText(
-      `${renderApplication(r.user)} — ${DONE_LABEL[action]}${note}`,
-      { parse_mode: 'HTML' },
-    )
-    .catch((err: unknown) =>
-      logger.warn({ err }, 'доступ: не удалось обновить сообщение заявки'),
-    );
+  await markDone(`${renderApplication(r.user)} — ${DONE_LABEL[action]}${note}`);
 }
 
 export async function onUsers(ctx: Context): Promise<void> {
@@ -201,10 +240,19 @@ async function decideByCommand(
     await ctx.reply('Не нашёл пользователя.');
     return;
   }
+  if (r.kind === 'self') {
+    await ctx.reply(
+      'Это ты — владельцу статус не меняю: доступ у него есть всегда.',
+    );
+    return;
+  }
   if (r.kind === 'already') {
-    await ctx.reply(`${userLabelHtml(r.user)} — ${ALREADY_LABEL[action]}`, {
-      parse_mode: 'HTML',
-    });
+    await ctx.reply(
+      `${userLabelHtml(r.user)} — ${ALREADY_LABEL[r.user.status]}`,
+      {
+        parse_mode: 'HTML',
+      },
+    );
     return;
   }
   const note = r.notified || action === 'ban' ? '' : ' (уведомить не удалось)';
