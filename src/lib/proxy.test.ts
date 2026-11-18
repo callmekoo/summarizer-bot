@@ -89,6 +89,14 @@ test('proxyUrlSchema: только http/https, пусто — без прокс�
     false,
   );
   assert.equal(proxyUrlSchema.safeParse('мусор').success, false);
+  // undici раскодирует логин/пароль и на битом «%» упал бы при старте
+  const broken = proxyUrlSchema.safeParse('http://u:p%zz@proxy.example:8080');
+  assert.equal(broken.success, false);
+  assert.doesNotMatch(broken.error?.issues[0]?.message ?? '', /p%zz/);
+  assert.equal(
+    proxyUrlSchema.parse('http://u:p%40ss@proxy.example:8080'),
+    'http://u:p%40ss@proxy.example:8080',
+  );
 });
 
 test('proxyLabel: без логина и пароля', () => {

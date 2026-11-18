@@ -50,3 +50,28 @@ test('redact: пароль прокси скрыт в закодированно
     'connect https://u:<скрыто>@proxy.test failed (<скрыто>)',
   );
 });
+
+test('redact: ключ в логине прокси (без пароля) скрыт', () => {
+  const redact = createRedactor(
+    proxySecrets('http://TOKEN123@proxy.test:8080'),
+  );
+  assert.equal(
+    redact('connect http://TOKEN123@proxy.test:8080 failed'),
+    'connect http://<скрыто>@proxy.test:8080 failed',
+  );
+});
+
+test('redact: короткий пароль прокси — только вместе с логином', () => {
+  const redact = createRedactor(proxySecrets('http://user:p@proxy.test:8080'));
+  assert.equal(
+    redact('connect http://user:p@proxy.test failed, port 1080'),
+    'connect http://<скрыто>@proxy.test failed, port 1080',
+  );
+  // слишком короткое целиком — не трогаем вовсе, лог дороже
+  assert.deepEqual(proxySecrets('http://u:p@proxy.test'), []);
+  assert.deepEqual(proxySecrets('http://abc@proxy.test'), []);
+});
+
+test('proxySecrets: битый «%» в пароле не роняет логгер', () => {
+  assert.deepEqual(proxySecrets('http://u:p%zzword@proxy.test'), ['p%zzword']);
+});

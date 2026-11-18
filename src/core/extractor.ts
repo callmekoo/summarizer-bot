@@ -36,7 +36,8 @@ async function getParse(): Promise<ParseFn> {
 }
 
 // rdrr ходит своим Agent'ом мимо прокси; в зоне withUntrustedFetch installProxy подменяет
-// его на прокси + ssrfGuard (DNS-проверка самого rdrr остаётся вторым слоем).
+// его на прокси + ssrfGuard. DNS-проверка rdrr живёт в том же Agent'е и уходит вместе с
+// ним: от rdrr остаётся лишь сверка самого хоста (localhost, IP-литерал), без DNS.
 function parseUserUrl(parse: ParseFn, url: string): Promise<any> {
   if (!config.PROXY_URL) return parse(url);
   return withUntrustedFetch(() => parse(url));

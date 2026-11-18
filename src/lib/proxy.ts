@@ -27,6 +27,25 @@ export const proxyUrlSchema = z
       message:
         'поддерживаются только http/https-прокси: http://host:port или https://user:pass@host:port',
     },
+  )
+  // undici раскодирует логин и пароль для Proxy-Authorization и на битом `%` падает
+  // URIError при старте. Ловим здесь, с понятным текстом и без значения в сообщении.
+  .refine(
+    (s) => {
+      if (s === undefined || !URL.canParse(s)) return true; // отбито выше
+      const { username, password } = new URL(s);
+      try {
+        decodeURIComponent(username);
+        decodeURIComponent(password);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    {
+      message:
+        'логин или пароль прокси содержат «%» не как %XX: спецсимволы кодируй (@ → %40, % → %25)',
+    },
   );
 
 const blocked = new BlockList();
