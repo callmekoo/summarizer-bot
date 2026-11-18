@@ -8,7 +8,7 @@ import {
 } from 'node:net';
 import { createRequire } from 'node:module';
 import { Readable } from 'node:stream';
-import { getGlobalDispatcher, setGlobalDispatcher } from 'undici';
+import { Agent, getGlobalDispatcher, setGlobalDispatcher } from 'undici';
 import {
   assertPublicHost,
   installProxy,
@@ -187,6 +187,11 @@ test('withUntrustedFetch: приватные адреса отбиты, публ
   });
   assert.equal(isSsrfError(wrapped), true);
   assert.equal(isSsrfError(new TypeError('fetch failed')), false);
+  // Своя проверка rdrr (класс не экспортирован, имя — да).
+  const rdrrErr = Object.assign(new Error('Refusing to fetch private IP'), {
+    name: 'PrivateNetworkError',
+  });
+  assert.equal(isSsrfError(rdrrErr), true);
   const res = await withUntrustedFetch(() =>
     fetch(`http://good.test:${targetPort}/ok`),
   );
@@ -197,6 +202,34 @@ test('withUntrustedFetch: приватные адреса отбиты, публ
   install('127.0.0.1');
   const local = await fetch(`http://127.0.0.1:${targetPort}/llm`);
   assert.equal(await local.text(), 'GET /llm 0');
+});
+
+test('явный dispatcher (как у rdrr) в зоне недоверенных заменяется прокси', async () => {
+  install();
+  // rdrr зовёт globalThis.fetch со своим Agent'ом — прямым, мимо прокси.
+  const direct = new Agent();
+  const init = { dispatcher: direct } as RequestInit;
+  const res = await withUntrustedFetch(() =>
+    globalThis.fetch(`http://yt.test:${targetPort}/meta`, init),
+  );
+  assert.equal(await res.text(), 'GET /meta 0');
+  assert.deepEqual(tunnels, [`yt.test:${targetPort}`]);
+  await assert.rejects(
+    withUntrustedFetch(() =>
+      globalThis.fetch(`http://127.0.0.1:${targetPort}/x`, init),
+    ),
+    (err: Error) => isSsrfError(err),
+  );
+
+  // Вне зоны чужой dispatcher уважаем.
+  install();
+  const own = await globalThis.fetch(
+    `http://127.0.0.1:${targetPort}/own`,
+    init,
+  );
+  assert.equal(await own.text(), 'GET /own 0');
+  assert.deepEqual(tunnels, []);
+  await direct.close();
 });
 
 test('fetch для grammY: потоковое тело и сигнал-полифилл', async () => {

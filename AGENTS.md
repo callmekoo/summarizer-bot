@@ -126,11 +126,13 @@ src/
   встроенный `fetch`, `openai` SDK и rdrr. **grammY — нет**: у него свой `node-fetch`, поэтому
   в `bot.ts` ему отдаётся `client.fetch`, и это обёртка: сигнал grammY создаёт полифиллом
   `abort-controller`, встроенный `fetch` такой отвергает. **rdrr сам передаёт в `fetch` свой
-  `Agent` с защитой от SSRF**, глобальный dispatcher на него не действует. Поэтому при
-  прокси `extractor` зовёт rdrr с `allowPrivateNetworks: true` внутри `withUntrustedFetch`, а
-  адреса проверяет наш `ssrfGuard` (interceptor; редиректы rdrr обходит сам, новым `fetch`
-  на каждый шаг). **Новый `fetch` по ссылке пользователя — только внутри
-  `withUntrustedFetch`.** Остаётся TOCTOU: проверяем по своему DNS, а прокси резолвит у себя.
+  `Agent`** (прямое соединение, мимо прокси), а в запросах к YouTube (oembed, player,
+  субтитры) — даже при `allowPrivateNetworks`: опция из `parse()` туда не доходит (реальный
+  баг: статьи шли, YouTube — нет). Поэтому `installProxy` оборачивает `globalThis.fetch`: в
+  зоне `withUntrustedFetch` (её ставит `extractor`) чужой `dispatcher` выкидывается, и
+  запрос идёт через прокси + наш `ssrfGuard`. DNS-проверка самого rdrr остаётся вторым
+  слоем. **Новый `fetch` по ссылке пользователя — только внутри `withUntrustedFetch`.**
+  Остаётся TOCTOU: проверяем по своему DNS, а прокси резолвит у себя.
   Пакет `undici` держим той же мажорной версии, что встроен в Node (`process.versions.undici`).
 - **`npm run check` гоняет хук** (`.claude/hooks/check.sh`, событие Stop в
   `.claude/settings.json`): после каждого ответа Claude, и при падении возвращает ему

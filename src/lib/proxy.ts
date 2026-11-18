@@ -85,10 +85,11 @@ export class SsrfError extends Error {
   }
 }
 
-/** Отказ ssrfGuard где-то в цепочке cause (rdrr и fetch заворачивают ошибку). */
+/** Отказ по приватному адресу — наш (ssrfGuard) или rdrr — где-то в цепочке cause. */
 export function isSsrfError(err: unknown): boolean {
   for (let e = err, depth = 0; e && depth < 10; depth++) {
     if (e instanceof SsrfError) return true;
+    if ((e as Error).name === 'PrivateNetworkError') return true;
     e = (e as { cause?: unknown }).cause;
   }
   return false;
@@ -162,12 +163,33 @@ export function proxyLabel(url: string): string {
 }
 
 /**
- * Ставит прокси глобальным dispatcher'ом (его берут встроенный fetch, openai SDK,
- * rdrr с allowPrivateNetworks) и возвращает fetch для grammY.
+ * Ставит прокси глобальным dispatcher'ом (его берут встроенный fetch и openai SDK),
+ * перехватывает fetch rdrr и возвращает fetch для grammY.
  */
 export function installProxy(opts: ProxyOptions): typeof fetch {
   setGlobalDispatcher(createProxyDispatcher(opts));
+  if (!originalFetch) {
+    originalFetch = globalThis.fetch;
+    globalThis.fetch = untrustedViaProxy(originalFetch);
+  }
   return nativeSignalFetch;
+}
+
+let originalFetch: typeof fetch | undefined;
+
+// rdrr передаёт в fetch свой Agent (прямое соединение — мимо прокси), а в YouTube-запросы
+// ещё и без allowPrivateNetworks. В зоне withUntrustedFetch его dispatcher выкидываем:
+// запрос идёт глобальным, через прокси и ssrfGuard.
+function untrustedViaProxy(base: typeof fetch): typeof fetch {
+  return (input, init) => {
+    if (!untrusted.getStore() || !init || !('dispatcher' in init)) {
+      return base(input, init);
+    }
+    const { dispatcher: _ignored, ...rest } = init as RequestInit & {
+      dispatcher?: unknown;
+    };
+    return base(input, rest);
+  };
 }
 
 // grammY на Node создаёт сигнал полифиллом abort-controller, встроенный fetch его отвергает.

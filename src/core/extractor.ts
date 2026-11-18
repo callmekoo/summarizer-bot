@@ -35,11 +35,11 @@ async function getParse(): Promise<ParseFn> {
   return parseFn;
 }
 
-// Своя защита rdrr от SSRF — это его собственный Agent, мимо глобального прокси. При
-// прокси отключаем её и проверяем адреса сами (ssrfGuard), каждый шаг редиректа.
+// rdrr ходит своим Agent'ом мимо прокси; в зоне withUntrustedFetch installProxy подменяет
+// его на прокси + ssrfGuard (DNS-проверка самого rdrr остаётся вторым слоем).
 function parseUserUrl(parse: ParseFn, url: string): Promise<any> {
   if (!config.PROXY_URL) return parse(url);
-  return withUntrustedFetch(() => parse(url, { allowPrivateNetworks: true }));
+  return withUntrustedFetch(() => parse(url));
 }
 
 const MAX_ATTEMPTS = 3;
