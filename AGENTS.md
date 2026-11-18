@@ -9,7 +9,7 @@
 
 ```sh
 # 1. Node только через nvm — добавь в PATH в КАЖДОМ bash-вызове (state не персистится):
-export PATH="$HOME/.nvm/versions/node/v22.22.3/bin:$PATH"
+export PATH="$HOME/.nvm/versions/node/v24.21.0/bin:$PATH"
 
 # 2. Зависимости (если ещё не стоят) и проверка, что всё зелёное:
 npm install
@@ -24,15 +24,15 @@ npm run dev
 
 ## Стек
 
-- **TypeScript / Node.js 22.13+** (`node:sqlite` без флага), ESM (`"type": "module"`, `module: NodeNext`).
+- **TypeScript / Node.js 24+** (`node:sqlite` без флага), ESM (`"type": "module"`, `module: NodeNext`).
 - **grammY** — телеграм-бот. **rdrr** — извлечение текста (как библиотека).
 - **LLM** — любой OpenAI-совместимый API через `openai` SDK; провайдер задаётся
   `LLM_BASE_URL` + `LLM_API_KEY` (дефолт — OpenRouter).
 - **zod** — валидация env, **pino** — логи. Оценка токенов — эвристика (символы÷3),
   без зависимости-токенайзера.
 
-> ⚠️ Node ставится через **nvm** (`v22.22.3`); в системном PATH его может не быть.
-> Перед командами: `nvm use 22` или `export PATH="$HOME/.nvm/versions/node/v22.22.3/bin:$PATH"`.
+> ⚠️ Node ставится через **nvm** (`v24.21.0`); в системном PATH его может не быть.
+> Перед командами: `nvm use 24` или `export PATH="$HOME/.nvm/versions/node/v24.21.0/bin:$PATH"`.
 
 ## Команды
 

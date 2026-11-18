@@ -2,7 +2,7 @@
 # (директива выше включает cache-mount; нужен BuildKit — в Docker 23+ он по умолчанию)
 
 # --- build stage: компилируем TypeScript в dist/ (нужны devDeps) ---
-FROM node:22-alpine AS build
+FROM node:24-alpine AS build
 WORKDIR /app
 
 # Сначала только манифесты — чтобы слой npm ci кэшировался, пока зависимости не менялись.
@@ -19,7 +19,7 @@ RUN npm run build
 RUN npm prune --omit=dev
 
 # --- runtime stage: только прод-зависимости + собранный код ---
-FROM node:22-alpine AS runtime
+FROM node:24-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 

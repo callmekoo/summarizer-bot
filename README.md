@@ -57,7 +57,7 @@ Telegram (регистрируется при старте через `setMyComm
 
 ## Стек
 
-TypeScript (Node 22.13+) · grammY · rdrr · OpenAI-совместимый LLM API (через `openai` SDK).
+TypeScript (Node 24+) · grammY · rdrr · OpenAI-совместимый LLM API (через `openai` SDK).
 
 ## Запуск
 
@@ -294,7 +294,7 @@ curl -s https://openrouter.ai/api/v1/models | \
 какая команда, модель, токены и стоимость. В логах для чужих запросов вместо ссылки — домен,
 вместо имени файла — расширение, заголовки и поисковые запросы не пишутся.
 
-**Хранилище** — SQLite (встроенный `node:sqlite`, нужен Node ≥ 22.13), файл `DB_PATH`.
+**Хранилище** — SQLite (встроенный `node:sqlite`, нужен Node ≥ 24), файл `DB_PATH`.
 В Docker — именованный том `bot-data`.
 
 **Бэкап.** Просто скопировать `bot.db` нельзя: база в режиме WAL, свежие записи лежат в
