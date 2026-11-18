@@ -17,6 +17,9 @@ services:
     # Метка для autoheal (см. опциональный сервис ниже).
     labels:
       autoheal: "true"
+    # Прокси на хосте (PROXY_URL=http://host.docker.internal:PORT) — раскомментируй.
+    # extra_hosts:
+    #   - "host.docker.internal:host-gateway"
     volumes:
       # База пользователей и статистики (DB_PATH=data/bot.db → /app/data/bot.db).
       # Именованный том, а не ./data: каталог хоста создался бы от root, и бот (USER node)

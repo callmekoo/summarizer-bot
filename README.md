@@ -222,6 +222,34 @@ podman exec summarizer-bot rm data/backup.db
 зависшего; команды бэкапа работают. **Не проверено**: запуск самого юнита через systemd и
 работа с настоящим Telegram — сделай `systemctl --user status` после первого старта.
 
+## Прокси
+
+`PROXY_URL` пускает через прокси **весь** исходящий трафик: Telegram API, LLM, извлечение
+статей и YouTube, `/search`, скачивание присланных файлов. Поддерживаются только
+http- и https-прокси (`http://127.0.0.1:10809`, `https://user:pass@proxy.example:443`);
+SOCKS — нет, у локальных клиентов вроде xray/sing-box обычно есть и HTTP-порт.
+Пароль из `PROXY_URL` в логи не попадает.
+
+`NO_PROXY` — исключения через запятую, как у curl: например `localhost`, если LLM — Ollama
+на этой же машине.
+
+Проверить прокси без бота: `PROXY_URL=http://127.0.0.1:10809 npm run search:smoke -- "запрос"`.
+
+**Ссылки пользователей и локальная сеть.** Без прокси rdrr сам не пускает ссылки на
+локальные адреса (`127.0.0.1`, `192.168.*` и т.п.). С прокси эту проверку делает бот: адрес
+из ссылки резолвится и отбивается, если он приватный, — на каждом шаге редиректа.
+
+**Прокси на хосте, бот в контейнере.** `127.0.0.1` внутри контейнера — это сам контейнер.
+Прокси должен слушать не только loopback (например `0.0.0.0` или адрес моста), а в
+`PROXY_URL` — адрес хоста:
+
+- Docker: `PROXY_URL=http://host.docker.internal:10809` и в `docker-compose.yml` у сервиса
+  `extra_hosts: ["host.docker.internal:host-gateway"]`;
+- Podman: `PROXY_URL=http://host.containers.internal:10809` (имя есть из коробки).
+
+Либо сеть хоста (`network_mode: host` / `Network=host` в quadlet) — тогда подойдёт и
+`127.0.0.1`.
+
 ## Переменные окружения
 
 | Переменная | Назначение | По умолчанию |
@@ -244,6 +272,8 @@ podman exec summarizer-bot rm data/backup.db
 | `DB_PATH` | файл SQLite с пользователями и статистикой | `data/bot.db` |
 | `ACCESS_RETRY_DAYS` | через сколько дней отклонённый может подать заявку снова | `7` |
 | `TZ` | часовой пояс для «сегодня» в `/stats` | системный (в Docker — UTC) |
+| `PROXY_URL` | http/https-прокси для всего исходящего трафика (см. «Прокси») | — (напрямую) |
+| `NO_PROXY` | хосты мимо прокси, через запятую | — |
 | `HEARTBEAT_FILE` | файл heartbeat для Docker healthcheck | `/tmp/heartbeat` |
 | `LOG_LEVEL` | уровень логов pino | `info` |
 
@@ -408,7 +438,8 @@ src/
                     youtubeSearch, access (решение о доступе), users (имена), stats
   llm/              клиент LLM, единая точка вызова (complete) + промпты
   lib/              url, logger, redact, reply, filename, concurrency, rateLimiter,
-                    store (база), requestContext (кто делает запрос), privacy (логи)
+                    store (база), requestContext (кто делает запрос), privacy (логи),
+                    proxy (прокси + проверка адресов ссылок)
   scripts/          searchSmoke — живая проверка /search (npm run search:smoke)
   **/*.test.ts      юнит-тесты рядом с кодом (node:test)
 

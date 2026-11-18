@@ -112,7 +112,7 @@ src/
     prompts.ts      SAFETY_RULES + промпты пересказа и статьи; wrapUntrusted (нонс-маркеры)
   lib/              url, logger, concurrency, rateLimiter, filename (slug для .md),
                     store (база процесса), requestContext (withRequest/currentRequest),
-                    privacy (sourceLogFields)
+                    privacy (sourceLogFields), proxy (installProxy, ssrfGuard)
   types.ts          ExtractResult, Chapter, TranscriptSegment, isVideo()
   scripts/          searchSmoke.ts — живая проверка поиска, в build не попадает
 ```
@@ -122,6 +122,16 @@ src/
 - **Секреты в логах.** `logger` чистит готовую строку от `BOT_TOKEN` и `LLM_API_KEY`
   (`lib/redact.ts`): grammY кладёт в сообщение ошибки полный URL с токеном. Пишешь в
   консоль мимо `logger` — секрет уедет в лог как есть.
+- **Прокси (`PROXY_URL`) — глобальный dispatcher undici** (`lib/proxy.ts`): его берут
+  встроенный `fetch`, `openai` SDK и rdrr. **grammY — нет**: у него свой `node-fetch`, поэтому
+  в `bot.ts` ему отдаётся `client.fetch`, и это обёртка: сигнал grammY создаёт полифиллом
+  `abort-controller`, встроенный `fetch` такой отвергает. **rdrr сам передаёт в `fetch` свой
+  `Agent` с защитой от SSRF**, глобальный dispatcher на него не действует. Поэтому при
+  прокси `extractor` зовёт rdrr с `allowPrivateNetworks: true` внутри `withUntrustedFetch`, а
+  адреса проверяет наш `ssrfGuard` (interceptor; редиректы rdrr обходит сам, новым `fetch`
+  на каждый шаг). **Новый `fetch` по ссылке пользователя — только внутри
+  `withUntrustedFetch`.** Остаётся TOCTOU: проверяем по своему DNS, а прокси резолвит у себя.
+  Пакет `undici` держим той же мажорной версии, что встроен в Node (`process.versions.undici`).
 - **`npm run check` гоняет хук** (`.claude/hooks/check.sh`, событие Stop в
   `.claude/settings.json`): после каждого ответа Claude, и при падении возвращает ему
   строки с ошибками. Руками из агента запускать не нужно.
@@ -285,6 +295,9 @@ YouTube (`search:smoke`) и владельцем в Telegram. Из облачн�
 Проверено юнит-тестами и владельцем в Telegram на двух аккаунтах, включая `$` в `/stats`
 (формат `usage.cost` OpenRouter подошёл). Вручную не гонялись блокировка бота
 (`my_chat_member`) и рестарт с `ALLOWED_USER_IDS` — их держат юнит-тесты.
+
+Готов **прокси** для всего исходящего трафика (`PROXY_URL`/`NO_PROXY`, http/https), Node
+поднят до 24. Проверено тестами с локальным CONNECT-прокси; с реальным прокси — за владельцем.
 
 Открыто (см. [PLAN.md](PLAN.md)):
 - **webhook** вместо polling — и тогда healthcheck переделать на HTTP `/health`;
