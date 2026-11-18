@@ -9,7 +9,7 @@
 
 ```sh
 # 1. Node только через nvm — добавь в PATH в КАЖДОМ bash-вызове (state не персистится):
-export PATH="$HOME/.nvm/versions/node/v22.22.3/bin:$PATH"
+export PATH="$HOME/.nvm/versions/node/v24.21.0/bin:$PATH"
 
 # 2. Зависимости (если ещё не стоят) и проверка, что всё зелёное:
 npm install
@@ -24,15 +24,15 @@ npm run dev
 
 ## Стек
 
-- **TypeScript / Node.js 22.13+** (`node:sqlite` без флага), ESM (`"type": "module"`, `module: NodeNext`).
+- **TypeScript / Node.js 24+** (`node:sqlite` без флага), ESM (`"type": "module"`, `module: NodeNext`).
 - **grammY** — телеграм-бот. **rdrr** — извлечение текста (как библиотека).
 - **LLM** — любой OpenAI-совместимый API через `openai` SDK; провайдер задаётся
   `LLM_BASE_URL` + `LLM_API_KEY` (дефолт — OpenRouter).
 - **zod** — валидация env, **pino** — логи. Оценка токенов — эвристика (символы÷3),
   без зависимости-токенайзера.
 
-> ⚠️ Node ставится через **nvm** (`v22.22.3`); в системном PATH его может не быть.
-> Перед командами: `nvm use 22` или `export PATH="$HOME/.nvm/versions/node/v22.22.3/bin:$PATH"`.
+> ⚠️ Node ставится через **nvm** (`v24.21.0`); в системном PATH его может не быть.
+> Перед командами: `nvm use 24` или `export PATH="$HOME/.nvm/versions/node/v24.21.0/bin:$PATH"`.
 
 ## Команды
 
@@ -112,7 +112,7 @@ src/
     prompts.ts      SAFETY_RULES + промпты пересказа и статьи; wrapUntrusted (нонс-маркеры)
   lib/              url, logger, concurrency, rateLimiter, filename (slug для .md),
                     store (база процесса), requestContext (withRequest/currentRequest),
-                    privacy (sourceLogFields)
+                    privacy (sourceLogFields), proxy (installProxy, ssrfGuard)
   types.ts          ExtractResult, Chapter, TranscriptSegment, isVideo()
   scripts/          searchSmoke.ts — живая проверка поиска, в build не попадает
 ```
@@ -122,6 +122,26 @@ src/
 - **Секреты в логах.** `logger` чистит готовую строку от `BOT_TOKEN` и `LLM_API_KEY`
   (`lib/redact.ts`): grammY кладёт в сообщение ошибки полный URL с токеном. Пишешь в
   консоль мимо `logger` — секрет уедет в лог как есть.
+- **Прокси (`PROXY_URL`) — глобальный dispatcher undici** (`lib/proxy.ts`): его берут
+  встроенный `fetch`, `openai` SDK и rdrr. **grammY — нет**: у него свой `node-fetch`, поэтому
+  в `bot.ts` ему отдаётся `client.fetch`, и это обёртка: сигнал grammY создаёт полифиллом
+  `abort-controller`, встроенный `fetch` такой отвергает. **rdrr сам передаёт в `fetch` свой
+  `Agent`** (прямое соединение, мимо прокси), а в запросах к YouTube (oembed, player,
+  субтитры) — даже при `allowPrivateNetworks`: опция из `parse()` туда не доходит (реальный
+  баг: статьи шли, YouTube — нет). Поэтому `installProxy` оборачивает `globalThis.fetch`: в
+  зоне `withUntrustedFetch` (её ставит `extractor`) чужой `dispatcher` выкидывается, и
+  запрос идёт через прокси + наш `ssrfGuard`. **Второго слоя нет:** DNS-проверка rdrr
+  живёт в `connect.lookup` того же `Agent`'а и уходит вместе с ним, от rdrr остаётся лишь
+  сверка самого хоста (`localhost`, IP-литерал). С прокси от локальной сети защищает только
+  `ssrfGuard`. **Новый `fetch` по ссылке пользователя — только внутри `withUntrustedFetch`.**
+  Остаётся TOCTOU: проверяем по своему DNS, а прокси резолвит у себя. И обратная сторона:
+  с прокси ссылкам пользователя нужен **рабочий DNS в контейнере** — не резолвится или
+  подменён на `0.0.0.0`/`127.0.0.1` (блокировки) → ссылка не откроется.
+  Секреты прокси в логах — `proxySecrets` (`lib/redact.ts`): пароль, а без него логин;
+  короче 4 символов по отдельности не вырезаются (изуродовали бы лог), только парой
+  `логин:пароль`. Битый `%` в логине/пароле отбивает `proxyUrlSchema` — иначе undici
+  падает `URIError` на старте.
+  Пакет `undici` держим той же мажорной версии, что встроен в Node (`process.versions.undici`).
 - **`npm run check` гоняет хук** (`.claude/hooks/check.sh`, событие Stop в
   `.claude/settings.json`): после каждого ответа Claude, и при падении возвращает ему
   строки с ошибками. Руками из агента запускать не нужно.
@@ -285,6 +305,10 @@ YouTube (`search:smoke`) и владельцем в Telegram. Из облачн�
 Проверено юнит-тестами и владельцем в Telegram на двух аккаунтах, включая `$` в `/stats`
 (формат `usage.cost` OpenRouter подошёл). Вручную не гонялись блокировка бота
 (`my_chat_member`) и рестарт с `ALLOWED_USER_IDS` — их держат юнит-тесты.
+
+Готов **прокси** для всего исходящего трафика (`PROXY_URL`/`NO_PROXY`, http/https), Node
+поднят до 24. Проверено тестами с локальным CONNECT-прокси и владельцем на реальном прокси
+(Telegram, статьи, YouTube, `/search`).
 
 Открыто (см. [PLAN.md](PLAN.md)):
 - **webhook** вместо polling — и тогда healthcheck переделать на HTTP `/health`;

@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { z } from 'zod';
+import { proxyUrlSchema } from './lib/proxy.js';
 
 // Список Telegram user ID через запятую → массив чисел. Это пользователи, одобренные
 // заранее: при старте они становятся approved без заявки (кроме тех, по кому владелец
@@ -52,6 +53,10 @@ const schema = z.object({
   DB_PATH: z.string().min(1).default('data/bot.db'),
   // Через сколько дней отклонённый может подать заявку снова.
   ACCESS_RETRY_DAYS: z.coerce.number().int().min(1).default(7),
+  // Прокси для всего исходящего трафика (http/https). Пусто — напрямую.
+  PROXY_URL: proxyUrlSchema,
+  // Хосты мимо прокси, через запятую (как у curl): напр. localhost для Ollama.
+  NO_PROXY: z.string().default(''),
   HEARTBEAT_FILE: z.string().default('/tmp/heartbeat'),
   LOG_LEVEL: z.string().default('info'),
 });

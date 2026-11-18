@@ -1,4 +1,6 @@
+import { config } from '../config.js';
 import { logger } from '../lib/logger.js';
+import { isSsrfError, withUntrustedFetch } from '../lib/proxy.js';
 import { logSource } from '../lib/requestContext.js';
 import type { Chapter, ExtractResult, TranscriptSegment } from '../types.js';
 
@@ -33,6 +35,14 @@ async function getParse(): Promise<ParseFn> {
   return parseFn;
 }
 
+// rdrr ходит своим Agent'ом мимо прокси; в зоне withUntrustedFetch installProxy подменяет
+// его на прокси + ssrfGuard. DNS-проверка rdrr живёт в том же Agent'е и уходит вместе с
+// ним: от rdrr остаётся лишь сверка самого хоста (localhost, IP-литерал), без DNS.
+function parseUserUrl(parse: ParseFn, url: string): Promise<any> {
+  if (!config.PROXY_URL) return parse(url);
+  return withUntrustedFetch(() => parse(url));
+}
+
 const MAX_ATTEMPTS = 3;
 const BACKOFF_MS = 500;
 
@@ -47,7 +57,10 @@ export async function extract(url: string): Promise<ExtractResult> {
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
-      const result: any = await withTimeout(parse(url), TIMEOUT_MS);
+      const result: any = await withTimeout(
+        parseUserUrl(parse, url),
+        TIMEOUT_MS,
+      );
 
       const markdown = String(result?.markdown ?? result?.content ?? '').trim();
       if (!markdown) {
@@ -79,6 +92,10 @@ export async function extract(url: string): Promise<ExtractResult> {
       };
     } catch (err) {
       if (err instanceof ExtractError && err.kind === 'empty') throw err;
+      if (isSsrfError(err)) {
+        logger.warn(logSource({ url }), 'rdrr: ссылка ведёт в локальную сеть');
+        throw new ExtractError('failed', 'ссылка ведёт в локальную сеть');
+      }
       lastErr = err;
       if (attempt < MAX_ATTEMPTS) {
         logger.warn(
