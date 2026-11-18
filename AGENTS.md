@@ -299,7 +299,8 @@ YouTube (`search:smoke`) и владельцем в Telegram. Из облачн�
 (`my_chat_member`) и рестарт с `ALLOWED_USER_IDS` — их держат юнит-тесты.
 
 Готов **прокси** для всего исходящего трафика (`PROXY_URL`/`NO_PROXY`, http/https), Node
-поднят до 24. Проверено тестами с локальным CONNECT-прокси; с реальным прокси — за владельцем.
+поднят до 24. Проверено тестами с локальным CONNECT-прокси и владельцем на реальном прокси
+(Telegram, статьи, YouTube, `/search`).
 
 Открыто (см. [PLAN.md](PLAN.md)):
 - **webhook** вместо polling — и тогда healthcheck переделать на HTTP `/health`;
