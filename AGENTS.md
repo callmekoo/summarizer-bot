@@ -282,9 +282,9 @@ YouTube (`search:smoke`) и владельцем в Telegram. Из облачн�
 Готов **доступ по заявкам и статистика** (Этап 9): заявка владельцу с кнопками, кулдаун
 после отказа, бан, `/users`, `/stats` (запросы, токены, $ из `usage.cost` OpenRouter),
 `/approve`/`/revoke`/`/ban`; SQLite (`node:sqlite`), именованный Docker-том `bot-data`.
-Проверено юнит-тестами и smoke-прогоном с фейковым LLM; в живом Telegram — за владельцем.
-Формат `usage.cost` OpenRouter из песочницы не сверить (openrouter.ai закрыт) — проверить
-на первом живом запросе: если `/stats` показывает «$ —», поле пришло иначе.
+Проверено юнит-тестами и владельцем в Telegram на двух аккаунтах, включая `$` в `/stats`
+(формат `usage.cost` OpenRouter подошёл). Вручную не гонялись блокировка бота
+(`my_chat_member`) и рестарт с `ALLOWED_USER_IDS` — их держат юнит-тесты.
 
 Открыто (см. [PLAN.md](PLAN.md)):
 - **webhook** вместо polling — и тогда healthcheck переделать на HTTP `/health`;
