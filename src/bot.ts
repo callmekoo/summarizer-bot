@@ -26,6 +26,7 @@ import {
 } from './handlers/admin.js';
 import { rateLimit } from './middleware/rateLimit.js';
 import { initStore } from './lib/store.js';
+import { installProxy, proxyLabel } from './lib/proxy.js';
 import { seedApproved } from './db/users.js';
 import type { Db } from './db/database.js';
 
@@ -49,7 +50,26 @@ logger.info(
   'доступ по заявкам включён',
 );
 
-const bot = new Bot(config.BOT_TOKEN);
+// До первого запроса: глобальный dispatcher берут fetch, openai SDK и rdrr, а grammY
+// ходит своим fetch — ему отдаём обёртку явно.
+let proxyFetch: typeof fetch | undefined;
+if (config.PROXY_URL) {
+  proxyFetch = installProxy({
+    url: config.PROXY_URL,
+    noProxy: config.NO_PROXY,
+  });
+  logger.info(
+    {
+      proxy: proxyLabel(config.PROXY_URL),
+      noProxy: config.NO_PROXY || undefined,
+    },
+    'исходящий трафик через прокси',
+  );
+}
+
+const bot = new Bot(config.BOT_TOKEN, {
+  client: proxyFetch ? { fetch: proxyFetch as never } : undefined,
+});
 
 bot.use(
   createAccess({

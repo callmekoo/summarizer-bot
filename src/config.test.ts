@@ -18,6 +18,8 @@ test('config: парсинг, дефолты и обратная совмест�
   delete process.env.DB_PATH;
   delete process.env.ACCESS_RETRY_DAYS;
   delete process.env.MODEL_FALLBACK;
+  delete process.env.PROXY_URL;
+  delete process.env.NO_PROXY;
 
   const { config } = await import('./config.js');
 
@@ -38,4 +40,7 @@ test('config: парсинг, дефолты и обратная совмест�
   assert.equal(config.ADMIN_USER_ID, 42);
   assert.equal(config.DB_PATH, 'data/bot.db');
   assert.equal(config.ACCESS_RETRY_DAYS, 7);
+  // прокси по умолчанию нет
+  assert.equal(config.PROXY_URL, undefined);
+  assert.equal(config.NO_PROXY, '');
 });

@@ -1,9 +1,13 @@
 import pino from 'pino';
 import { config } from '../config.js';
-import { createRedactor } from './redact.js';
+import { createRedactor, proxySecrets } from './redact.js';
 import { serializeError } from './errorLog.js';
 
-const redact = createRedactor([config.BOT_TOKEN, config.LLM_API_KEY]);
+const redact = createRedactor([
+  config.BOT_TOKEN,
+  config.LLM_API_KEY,
+  ...proxySecrets(config.PROXY_URL),
+]);
 
 export const logger = pino(
   {

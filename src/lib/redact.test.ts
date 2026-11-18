@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createRedactor } from './redact.js';
+import { createRedactor, proxySecrets } from './redact.js';
 
 test('redact: токен из URL ошибки grammY не доезжает до лога', () => {
   const redact = createRedactor(['123456:AAFlyxTRE_mQUEZulhGp']);
@@ -37,4 +37,16 @@ test('redact: пустой секрет не режет строку по сим
 test('redact: строка без секретов не меняется', () => {
   const redact = createRedactor(['секрет']);
   assert.equal(redact('обычная строка лога'), 'обычная строка лога');
+});
+
+test('redact: пароль прокси скрыт в закодированном и обычном виде', () => {
+  assert.deepEqual(proxySecrets(undefined), []);
+  assert.deepEqual(proxySecrets('http://127.0.0.1:10809'), []);
+  const redact = createRedactor(
+    proxySecrets('https://u:p%40ss@proxy.test:443'),
+  );
+  assert.equal(
+    redact('connect https://u:p%40ss@proxy.test failed (p@ss)'),
+    'connect https://u:<скрыто>@proxy.test failed (<скрыто>)',
+  );
 });

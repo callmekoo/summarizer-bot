@@ -6,9 +6,10 @@
  *
  * Печатает, что попало бы в список, и что отсеяно и почему. `--save` кладёт сырой
  * ответ InnerTube в файл — из него обновляют фикстуру в youtubeSearch.test.ts, если
- * YouTube поменял формат выдачи.
+ * YouTube поменял формат выдачи. С PROXY_URL в окружении — через прокси.
  */
 import { writeFileSync } from 'node:fs';
+import { installProxy, proxyLabel, proxyUrlSchema } from '../lib/proxy.js';
 import {
   fetchSearchJson,
   parseSearchResults,
@@ -28,6 +29,16 @@ if (!query) {
     'Использование: npm run search:smoke -- "<запрос>" [--save file.json]',
   );
   process.exit(1);
+}
+
+const proxy = proxyUrlSchema.safeParse(process.env.PROXY_URL);
+if (!proxy.success) {
+  console.error(`❌ PROXY_URL: ${proxy.error.issues[0]?.message}`);
+  process.exit(1);
+}
+if (proxy.data) {
+  installProxy({ url: proxy.data, noProxy: process.env.NO_PROXY });
+  console.log(`через прокси ${proxyLabel(proxy.data)}`);
 }
 
 const json = await fetchSearchJson(query).catch((err: unknown) => {
