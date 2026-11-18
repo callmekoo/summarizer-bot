@@ -10,6 +10,9 @@ import { createLimiter } from '../lib/concurrency.js';
 import { replyTo } from '../lib/reply.js';
 import { config } from '../config.js';
 import { logger } from '../lib/logger.js';
+import { withRequest, logSource } from '../lib/requestContext.js';
+import { getDb } from '../lib/store.js';
+import { requestUser } from './onLink.js';
 
 // Тот же лимит тяжёлых обработок, что и у пересказа: статья ещё дороже (десяток вызовов),
 // параллелить их на free-тире — гарантированный шторм 429.
@@ -35,6 +38,18 @@ export async function runArticle(
   url: string,
   replyToMessageId: number | undefined,
 ): Promise<void> {
+  const user = requestUser(ctx);
+  await withRequest({ db: getDb(), now: Date.now }, user, 'article', () =>
+    articleTracked(ctx, url, replyToMessageId),
+  );
+}
+
+/** Тело runArticle внутри учтённого запроса; true — статья доставлена. */
+async function articleTracked(
+  ctx: Context,
+  url: string,
+  replyToMessageId: number | undefined,
+): Promise<boolean> {
   const status = await ctx.reply('⏳ Извлекаю текст…');
   const typing = setInterval(() => {
     ctx.replyWithChatAction('upload_document').catch(() => {});
@@ -88,7 +103,7 @@ export async function runArticle(
 
     logger.info(
       {
-        url,
+        ...logSource({ url }),
         ok: true,
         command: 'article',
         model: result.model,
@@ -103,12 +118,13 @@ export async function runArticle(
       },
       'request',
     );
+    return true;
   } catch (err) {
     await ctx.reply(userMessageForError(err), replyTo(replyToMessageId));
     logger.error(
       {
         err,
-        url,
+        ...logSource({ url }),
         ok: false,
         command: 'article',
         reason: errorReason(err),
@@ -119,6 +135,7 @@ export async function runArticle(
       },
       'request',
     );
+    return false;
   } finally {
     clearInterval(typing);
     await ctx.api

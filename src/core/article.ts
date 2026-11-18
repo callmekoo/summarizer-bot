@@ -8,6 +8,7 @@ import {
 } from '../llm/complete.js';
 import { config } from '../config.js';
 import { logger } from '../lib/logger.js';
+import { logSource } from '../lib/requestContext.js';
 import { isVideo, type ExtractResult } from '../types.js';
 
 export interface ArticleResult {
@@ -64,7 +65,7 @@ export async function buildArticle(
   const clean = stripAdChapters(transcript, extracted.chapters);
   const chunks = chunkTranscript(clean, extracted.chapters, chunkChars);
   logger.info(
-    { chunks: chunks.length, url: extracted.url },
+    { chunks: chunks.length, ...logSource({ url: extracted.url }) },
     'собираю статью из расшифровки',
   );
 
@@ -95,7 +96,7 @@ export async function buildArticle(
         `> ⚠️ Не удалось обработать фрагмент ${i + 1} из ${chunks.length}.`,
       );
       logger.warn(
-        { err, chunk: i + 1, url: extracted.url },
+        { err, chunk: i + 1, ...logSource({ url: extracted.url }) },
         'фрагмент статьи не обработан',
       );
     }

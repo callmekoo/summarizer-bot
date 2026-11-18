@@ -51,7 +51,8 @@ export function stripAdChapters(
   logger.info(
     {
       dropped: transcript.length - kept.length,
-      chapters: [...adIndexes].map((i) => chapters[i].title),
+      // Названия глав — содержимое запроса, в лог не пишем: хватит их числа.
+      adChapters: adIndexes.size,
     },
     'вырезаны рекламные главы',
   );

@@ -10,7 +10,8 @@ export async function rateLimit(
   next: NextFunction,
 ): Promise<void> {
   const id = ctx.from?.id;
-  if (id === undefined) {
+  // Владельца не лимитируем: его запросы — его деньги.
+  if (id === undefined || id === config.ADMIN_USER_ID) {
     return next();
   }
 

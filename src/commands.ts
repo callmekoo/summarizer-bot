@@ -18,6 +18,11 @@ export interface BotCommand {
   usage?: string;
   /** Абзац для /help; у самоочевидных команд не нужен. Разметку добавляет renderHelp. */
   details?: string;
+  /**
+   * Только для владельца: в меню у него одного (setMyCommands со scope chat), в /help нет,
+   * у остальных команды не существует (bot.filter(isAdmin) в bot.ts).
+   */
+  admin?: true;
 }
 
 // Порядок = порядок в меню Telegram. Сверху то, чем пользуются каждый день.
@@ -51,7 +56,31 @@ export const COMMANDS: BotCommand[] = [
   },
   { command: 'help', description: 'список команд и что они делают' },
   { command: 'start', description: 'краткое приветствие' },
+  {
+    command: 'users',
+    description: 'кто одобрен, ждёт, отклонён, забанен',
+    admin: true,
+  },
+  {
+    command: 'stats',
+    description: 'статистика: всего или /stats <id|@ник>',
+    admin: true,
+  },
+  {
+    command: 'approve',
+    description: 'одобрить: /approve <id|@ник>',
+    admin: true,
+  },
+  {
+    command: 'revoke',
+    description: 'отозвать доступ: /revoke <id|@ник>',
+    admin: true,
+  },
+  { command: 'ban', description: 'забанить: /ban <id|@ник>', admin: true },
 ];
+
+/** То, что видят и могут вызвать все одобренные пользователи. */
+export const PUBLIC_COMMANDS = COMMANDS.filter((c) => !c.admin);
 
 // Главное, чего нет в списке команд: команда для пересказа не обязательна, а пересказать
 // можно и присланный файл.
@@ -61,7 +90,7 @@ const FOOTER =
 
 /** Справка для /help: Telegram-HTML, готовый к отправке. */
 export function renderHelp(): string {
-  const blocks = COMMANDS.map((c) => {
+  const blocks = PUBLIC_COMMANDS.map((c) => {
     const args = c.usage ? ` ${escapeHtml(c.usage)}` : '';
     const head = `<b>/${c.command}${args}</b> — ${escapeHtml(c.description)}`;
     return c.details ? `${head}\n${escapeHtml(c.details)}` : head;

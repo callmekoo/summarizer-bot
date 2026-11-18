@@ -28,6 +28,10 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 
 # Бот работает по long-polling: входящий порт не нужен.
+# Каталог базы (пользователи + статистика) — под именованный том из docker-compose.yml.
+# Создаём заранее с владельцем node: свежий именованный том наследует эти права.
+RUN mkdir -p /app/data && chown node:node /app/data
+
 # Запускаемся под непривилегированным пользователем node (есть в образе).
 USER node
 

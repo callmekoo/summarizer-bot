@@ -53,3 +53,20 @@ test('createLimiter пробрасывает результат и ошибку'
 test('createLimiter отклоняет конкурентность < 1', () => {
   assert.throws(() => createLimiter(0));
 });
+
+test('задача из очереди выполняется в своём async-контексте, а не в предыдущей', async () => {
+  // Иначе ждавший в очереди запрос видит чужой currentRequest(): расход уходит не тому
+  // пользователю. Контекст должен браться в момент постановки в очередь.
+  const { AsyncLocalStorage } = await import('node:async_hooks');
+  const als = new AsyncLocalStorage<string>();
+  const limiter = createLimiter(1);
+  const seen: string[] = [];
+  const task = async () => {
+    await tick();
+    seen.push(als.getStore() ?? 'none');
+  };
+  await Promise.all(
+    ['A', 'B', 'C'].map((id) => als.run(id, () => limiter.run(task))),
+  );
+  assert.deepEqual(seen, ['A', 'B', 'C']);
+});

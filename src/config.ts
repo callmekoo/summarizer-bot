@@ -1,7 +1,9 @@
 import 'dotenv/config';
 import { z } from 'zod';
 
-// Список Telegram user ID через запятую → массив чисел. Пустой = allowlist выключен.
+// Список Telegram user ID через запятую → массив чисел. Это пользователи, одобренные
+// заранее: при старте они становятся approved без заявки (кроме тех, по кому владелец
+// уже решил иначе: отказ, /revoke, бан).
 const allowedUserIds = z
   .string()
   .default('')
@@ -40,7 +42,16 @@ const schema = z.object({
   MAX_INPUT_TOKENS: z.coerce.number().int().positive().default(200_000),
   RATE_LIMIT_PER_MIN: z.coerce.number().int().positive().default(5),
   MAX_CONCURRENCY: z.coerce.number().int().positive().default(2),
+  // Владелец бота: получает заявки, видит статистику, не проходит проверку доступа.
+  ADMIN_USER_ID: z.coerce
+    .number<string>({ error: 'ADMIN_USER_ID обязателен (твой Telegram id)' })
+    .int()
+    .positive(),
   ALLOWED_USER_IDS: allowedUserIds,
+  // SQLite с пользователями и статистикой. В Docker — именованный том /app/data.
+  DB_PATH: z.string().min(1).default('data/bot.db'),
+  // Через сколько дней отклонённый может подать заявку снова.
+  ACCESS_RETRY_DAYS: z.coerce.number().int().min(1).default(7),
   HEARTBEAT_FILE: z.string().default('/tmp/heartbeat'),
   LOG_LEVEL: z.string().default('info'),
 });

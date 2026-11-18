@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { COMMANDS, renderHelp } from './commands.js';
+import { COMMANDS, PUBLIC_COMMANDS, renderHelp } from './commands.js';
 
 // commands.ts тянет только formatter (чистый), поэтому config тут не при чём —
 // импортируем статически, без плясок с окружением, как в summarizer.test.ts.
@@ -41,9 +41,10 @@ test('реестр совпадает с регистрациями в bot.ts', 
   // bot.ts в юнит-тесте не импортируешь — на верхнем уровне он поднимает polling, поэтому
   // сверяемся по исходнику. Тест ломается, если добавить bot.command() мимо commands.ts.
   const source = readFileSync(new URL('./bot.ts', import.meta.url), 'utf8');
-  const registered = [...source.matchAll(/bot\.command\('([a-z0-9_]+)'/g)].map(
-    (m) => m[1],
-  );
+  // Админские команды регистрируются на `admin = bot.filter(isAdmin)`.
+  const registered = [
+    ...source.matchAll(/(?:bot|admin)\.command\('([a-z0-9_]+)'/g),
+  ].map((m) => m[1]);
 
   assert.deepEqual(
     [...registered].sort(),
@@ -52,9 +53,9 @@ test('реестр совпадает с регистрациями в bot.ts', 
   );
 });
 
-test('renderHelp упоминает каждую команду и её описание', () => {
+test('renderHelp упоминает каждую публичную команду и её описание', () => {
   const help = renderHelp();
-  for (const c of COMMANDS) {
+  for (const c of PUBLIC_COMMANDS) {
     assert.ok(help.includes(`/${c.command}`), `в справке нет /${c.command}`);
     assert.ok(
       help.includes(c.description),
@@ -75,4 +76,20 @@ test('renderHelp рассказывает про пересказ файлов',
   for (const ext of ['.md', '.html', '.srt', '.fb2']) {
     assert.ok(help.includes(ext), ext);
   }
+});
+
+test('админские команды есть в реестре, но не в /help', () => {
+  const admin = COMMANDS.filter((c) => c.admin).map((c) => c.command);
+  assert.deepEqual([...admin].sort(), [
+    'approve',
+    'ban',
+    'revoke',
+    'stats',
+    'users',
+  ]);
+  const help = renderHelp();
+  for (const name of admin) {
+    assert.ok(!help.includes(`/${name}`), `/${name} утёк в /help`);
+  }
+  assert.ok(PUBLIC_COMMANDS.every((c) => !c.admin));
 });
